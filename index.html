@@ -1,0 +1,1151 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DA Roulette Widget</title>
+<style>
+  :root{
+    --bar-bg: rgba(20,20,28,0.55);
+    --bar-fill-from: #ff5ec4;
+    --bar-fill-to: #7c4dff;
+    --accent: #ffd24d;
+    --text: #ffffff;
+    --panel-bg: rgba(15,15,20,0.92);
+    --card-navy-dark: #121a2c;
+    --card-navy-light: #1b2740;
+    --card-border: #37486c;
+    --roulette-accent: #ff6a3d;
+  }
+  html,body{
+    margin:0; padding:0; background:transparent; overflow:hidden;
+    font-family: 'Segoe UI', Tahoma, Arial, sans-serif;
+    color: var(--text);
+    width:100%; height:100%;
+  }
+  #stage{ position:relative; width:100%; height:100%; }
+  body.noProgress #progressWrap{ display:none !important; }
+  body.noRoulette #rouletteWrap{ display:none !important; }
+  body.noProgress #statusDot{ display:none !important; }
+
+  /* ---------- "до рулетки" card ---------- */
+  #progressWrap{
+    position:absolute; left:50%; top:26px; transform:translateX(-50%);
+    width:300px; max-width:85vw;
+    transition: opacity .4s ease, transform .4s ease;
+  }
+  #progressWrap.hidden{ opacity:0; pointer-events:none; transform:translateX(-50%) translateY(-16px); }
+  #progressCard{
+    border-radius:14px; overflow:hidden; background:var(--card-navy-dark);
+    border:1px solid var(--card-border);
+    box-shadow:0 8px 26px rgba(0,0,0,.55), inset 0 0 0 1px rgba(255,255,255,.03);
+  }
+  #progressTitle{
+    text-align:center; padding:8px 10px 7px; font-size:13px; font-weight:800; letter-spacing:.06em;
+    text-transform:uppercase; color:#fff; background:rgba(255,255,255,.03);
+    border-bottom:1px solid var(--card-border);
+  }
+  #progressAmountRow{
+    position:relative; padding:11px 12px; text-align:center; font-size:17px; font-weight:800;
+    background:var(--card-navy-light); overflow:hidden;
+  }
+  #progressAmountFill{
+    position:absolute; left:0; top:0; bottom:0; width:0%;
+    background:linear-gradient(90deg, rgba(124,77,255,.55), rgba(255,94,196,.55));
+    transition:width .6s cubic-bezier(.22,.9,.3,1);
+  }
+  #progressText{ position:relative; z-index:1; text-shadow:0 1px 4px rgba(0,0,0,.6); }
+
+  /* ---------- roulette ---------- */
+  #rouletteWrap{
+    position:absolute; left:50%; top:18px; transform:translateX(-50%) scale(.94);
+    width:760px; max-width:94vw; opacity:0; pointer-events:none;
+    transition: opacity .4s ease, transform .4s ease;
+  }
+  #rouletteWrap.visible{ opacity:1; transform:translateX(-50%) scale(1); pointer-events:auto; }
+
+  #rouletteTitleRow{ position:relative; height:50px; margin-bottom:-16px; }
+  #rouletteGlow{
+    position:absolute; left:8%; right:8%; top:-28px; height:90px; z-index:0;
+    background: radial-gradient(ellipse at center, rgba(255,140,60,.55), rgba(255,80,150,.22) 45%, transparent 75%);
+    filter: blur(6px);
+  }
+  #rouletteTitle{
+    position:relative; z-index:1; font-size:21px; font-weight:900; letter-spacing:.03em;
+    color:#fff7ea; text-shadow: 0 0 10px rgba(255,150,60,.85), 0 2px 4px rgba(0,0,0,.8);
+    padding:8px 0 0 26px;
+  }
+
+  #roulettePanel{
+    position:relative; padding:22px 20px 18px; border-radius:16px;
+    background:
+      radial-gradient(ellipse at 50% -20%, rgba(255,120,70,.18), transparent 55%),
+      repeating-linear-gradient(135deg, rgba(255,255,255,.015) 0 2px, transparent 2px 6px),
+      linear-gradient(180deg, #2a1026 0%, #190a1c 55%, #130814 100%);
+    border:1px solid rgba(255,140,70,.35);
+    box-shadow: 0 12px 34px rgba(0,0,0,.6), inset 0 0 40px rgba(0,0,0,.45);
+  }
+  .cornerDeco{ position:absolute; width:16px; height:16px; }
+  .cornerDeco:before, .cornerDeco:after{
+    content:""; position:absolute; background:var(--roulette-accent);
+    box-shadow:0 0 6px var(--roulette-accent);
+  }
+  .cornerDeco:before{ left:0; top:6px; width:16px; height:3px; border-radius:2px; }
+  .cornerDeco:after{ left:6px; top:0; width:3px; height:16px; border-radius:2px; }
+  .cornerDeco.tl{ top:8px; left:8px; }
+  .cornerDeco.tr{ top:8px; right:8px; }
+  .cornerDeco.bl{ bottom:8px; left:8px; }
+  .cornerDeco.br{ bottom:8px; right:8px; }
+
+  #reelViewport{
+    position:relative; width:100%; height:122px; border-radius:12px;
+    background: rgba(0,0,0,.35);
+    box-shadow: inset 0 0 0 1px rgba(255,255,255,.08), inset 0 10px 30px rgba(0,0,0,.5);
+    overflow:hidden;
+  }
+  #reelTrack{
+    position:absolute; left:0; top:0; height:100%; display:flex; gap:10px; padding:10px 0;
+    box-sizing:border-box; will-change:transform;
+  }
+  .reelItem{
+    flex:0 0 auto; width:132px; height:100%; display:flex; align-items:center; justify-content:center;
+    text-align:center; padding:0 10px; box-sizing:border-box; font-weight:700; font-size:14px; line-height:1.25;
+    border-radius:10px; border:2px solid var(--roulette-accent);
+    background: rgba(10,6,14,.72); color:#fff;
+  }
+  .reelItem.win{ animation: winPulse 1s ease infinite; }
+  @keyframes winPulse{
+    0%,100%{ filter:brightness(1); } 50%{ filter:brightness(1.6); }
+  }
+  #reelMarker{
+    position:relative; z-index:3; display:flex; flex-direction:column; align-items:center;
+    pointer-events:none; margin-bottom:-8px;
+  }
+  #reelMarkerBolt{
+    font-size:20px; line-height:1; margin-bottom:-5px;
+    color:#b388ff; text-shadow:0 0 10px #b388ff, 0 0 22px #7c4dff;
+  }
+  #reelMarkerArrow{
+    width:0; height:0; border-left:11px solid transparent; border-right:11px solid transparent;
+    border-top:17px solid #b388ff;
+    filter: drop-shadow(0 0 6px #7c4dff);
+  }
+  #winBanner{
+    text-align:center; margin-top:12px; font-size:20px; font-weight:800; color:#fff;
+    text-shadow:0 2px 10px rgba(0,0,0,.85); opacity:0; transition:opacity .3s ease;
+  }
+  #winBanner.show{ opacity:1; }
+
+  /* ---------- status dot ---------- */
+  #statusDot{
+    position:absolute; left:10px; top:10px; width:12px; height:12px; border-radius:50%;
+    background:#888; box-shadow:0 0 6px rgba(0,0,0,.6); opacity:.0;
+  }
+  body.showStatus #statusDot{ opacity:1; }
+  #statusDot.ok{ background:#4caf50; }
+  #statusDot.warn{ background:#ffb300; }
+  #statusDot.err{ background:#e53935; }
+
+  /* ---------- gear / settings ---------- */
+  #gearBtn{
+    position:absolute; right:10px; bottom:10px; width:34px; height:34px; border-radius:50%;
+    background: rgba(0,0,0,.4); border:1px solid rgba(255,255,255,.25); color:#fff;
+    font-size:18px; cursor:pointer; display:flex; align-items:center; justify-content:center;
+    opacity:.35; transition:opacity .2s ease;
+  }
+  #gearBtn:hover{ opacity:1; }
+
+  #settingsPanel{
+    position:absolute; right:10px; bottom:54px; width:420px; max-width:92vw; max-height:85vh;
+    overflow:auto; background:var(--panel-bg); border-radius:14px; padding:16px 18px;
+    box-shadow:0 10px 40px rgba(0,0,0,.6); display:none; font-size:13px; line-height:1.4;
+  }
+  #settingsPanel.open{ display:block; }
+  #settingsPanel h3{ margin:14px 0 6px; font-size:14px; color:var(--accent); }
+  #settingsPanel h3:first-child{ margin-top:0; }
+  #settingsPanel label{ display:block; margin:8px 0 3px; color:#cfcfcf; }
+  #settingsPanel input[type=text], #settingsPanel input[type=number], #settingsPanel textarea{
+    width:100%; box-sizing:border-box; padding:6px 8px; border-radius:6px; border:1px solid #444;
+    background:#1b1b22; color:#fff; font-size:13px;
+  }
+  #settingsPanel textarea{ min-height:90px; font-family:monospace; font-size:11px; }
+  #settingsPanel button{
+    cursor:pointer; border:none; border-radius:7px; padding:7px 12px; font-size:13px; font-weight:600;
+    background:#3d3d4d; color:#fff; margin:4px 4px 0 0;
+  }
+  #settingsPanel button.primary{ background: linear-gradient(90deg,var(--bar-fill-from),var(--bar-fill-to)); }
+  #settingsPanel button.danger{ background:#8a2d2d; }
+  #settingsPanel .row{ display:flex; gap:8px; }
+  #settingsPanel .row > *{ flex:1; }
+  .smallBtn{ padding:2px 7px !important; font-size:11px !important; }
+  body.noProgress .progressOnlySection{ display:none !important; }
+  body.noRoulette .rouletteOnlySection{ display:none !important; }
+
+  /* ---------- category cards ---------- */
+  #categoriesGrid{ display:flex; flex-wrap:wrap; gap:10px; margin-top:8px; }
+  .catCard{
+    flex:1 1 170px; min-width:160px; background:#1b1b22; border-radius:10px; padding:10px;
+    border-left:4px solid var(--cat-color, #666); transition:opacity .2s ease;
+  }
+  .catCard.catDisabled{ opacity:.4; }
+  .catHeader{ display:flex; align-items:center; gap:2px; margin-bottom:6px; }
+  .catHeader input.catName{
+    flex:1; min-width:0; background:transparent; border:none; color:#fff; font-weight:700;
+    font-size:13px; padding:3px 4px; border-radius:4px;
+  }
+  .catHeader input.catName:focus{ background:#2a2a33; outline:none; }
+  .catIconBtn{
+    background:none; border:none; color:#ccc; cursor:pointer; font-size:15px; padding:2px 5px;
+    margin:0; border-radius:5px; line-height:1;
+  }
+  .catIconBtn:hover{ background:#2a2a33; }
+  .catIconBtn.danger{ color:#ff8080; }
+  select.catRarity{
+    width:100%; box-sizing:border-box; padding:5px 6px; border-radius:6px; border:1px solid #444;
+    background:#14141a; font-size:12px; font-weight:700; margin-bottom:6px;
+  }
+  .catTasksLabel{ display:block; font-size:11px; color:#999; margin-bottom:3px; }
+  textarea.catTasks{
+    width:100%; box-sizing:border-box; min-height:64px; padding:6px 7px; border-radius:6px;
+    border:1px solid #444; background:#14141a; color:#fff; font-size:12px; resize:vertical;
+  }
+  .catChance{ margin-top:5px; }
+  #addCategoryBtn{ margin-top:2px; }
+  #rarityWeightsGrid{ display:flex; flex-direction:column; gap:5px; margin-top:6px; }
+  .rarityWeightRow{ display:flex; align-items:center; gap:8px; }
+  .rarityWeightRow .rwLabel{ flex:1; font-weight:700; font-size:12px; }
+  .rarityWeightRow input[type=number]{ width:70px; }
+  .muted{ color:#888; font-size:11px; }
+  #authStatus{ font-size:12px; padding:6px 8px; border-radius:6px; background:#1b1b22; margin-top:4px; }
+  #authStatus.ok{ color:#8bffb0; }
+  #authStatus.bad{ color:#ff9b9b; }
+  a{ color: var(--accent); }
+</style>
+</head>
+<body>
+<div id="stage">
+  <div id="statusDot"></div>
+
+  <div id="progressWrap">
+    <div id="progressCard">
+      <div id="progressTitle">ДО РУЛЕТКИ</div>
+      <div id="progressAmountRow">
+        <div id="progressAmountFill"></div>
+        <span id="progressText">0 / 1000 ₽</span>
+      </div>
+    </div>
+  </div>
+
+  <div id="rouletteWrap">
+    <div id="rouletteTitleRow">
+      <div id="rouletteGlow"></div>
+      <div id="rouletteTitle">КРУТИМ КРУТИМ КРУТИМ</div>
+    </div>
+    <div id="roulettePanel">
+      <span class="cornerDeco tl"></span>
+      <span class="cornerDeco tr"></span>
+      <span class="cornerDeco bl"></span>
+      <span class="cornerDeco br"></span>
+      <div id="reelMarker">
+        <div id="reelMarkerBolt">⚡</div>
+        <div id="reelMarkerArrow"></div>
+      </div>
+      <div id="reelViewport">
+        <div id="reelTrack"></div>
+      </div>
+    </div>
+    <div id="winBanner"></div>
+  </div>
+
+  <button id="gearBtn" title="Настройки">⚙</button>
+
+  <div id="settingsPanel">
+    <div class="progressOnlySection">
+      <h3>DonationAlerts</h3>
+      <label>Client ID вашего приложения (создаётся на donationalerts.com/application/clients)</label>
+      <input type="text" id="cfgClientId" placeholder="например 12345">
+      <label>Redirect URI — впишите этот же адрес в настройках приложения на DonationAlerts</label>
+      <input type="text" id="redirectUriShow" readonly>
+      <div class="row" style="margin-top:8px;">
+        <button class="primary" id="loginBtn">Войти через DonationAlerts</button>
+        <button class="danger" id="logoutBtn">Выйти</button>
+      </div>
+      <div id="authStatus">не подключено</div>
+
+      <h3>Цель сбора</h3>
+      <label>Заголовок карточки сбора</label>
+      <input type="text" id="cfgProgressTitle" value="ДО РУЛЕТКИ">
+      <div class="row">
+        <div>
+          <label>Сумма цели</label>
+          <input type="number" id="cfgGoal" value="1000" min="1">
+        </div>
+        <div>
+          <label>Валюта (значок)</label>
+          <input type="text" id="cfgCurrency" value="₽" maxlength="4">
+        </div>
+      </div>
+      <label><input type="checkbox" id="cfgCarryOver" style="width:auto;"> переносить остаток сверх цели на новый круг</label>
+    </div>
+
+    <div class="rouletteOnlySection">
+      <h3>Рулетка</h3>
+      <label>Текст над рулеткой</label>
+      <input type="text" id="cfgRouletteTitle" value="КРУТИМ КРУТИМ КРУТИМ">
+      <div class="row">
+        <div>
+          <label>Длительность прокрутки, сек</label>
+          <input type="number" id="cfgSpinDuration" value="6" min="2" max="20" step="0.5">
+        </div>
+        <div>
+          <label>Показывать результат, сек</label>
+          <input type="number" id="cfgWinHold" value="5" min="1" max="30" step="0.5">
+        </div>
+      </div>
+      <label>Цвет акцента рулетки</label>
+      <input type="color" id="cfgRouletteAccent" value="#ff6a3d" style="width:48px; height:30px; padding:0; border:none;">
+
+      <div id="categoriesGrid"></div>
+      <button class="smallBtn" id="addCategoryBtn">+ добавить категорию</button>
+
+      <h3>Шансы по редкости</h3>
+      <div class="muted">Чем выше число, тем чаще выпадает вся категория этой редкости. Задания внутри категории равновероятны между собой.</div>
+      <div id="rarityWeightsGrid"></div>
+
+      <h3>Звук</h3>
+      <label><input type="checkbox" id="cfgMuteSound" style="width:auto;"> выключить звук рулетки</label>
+      <label>Громкость</label>
+      <input type="range" id="cfgSoundVolume" min="0" max="100" value="80">
+      <div class="row" style="margin-top:8px;">
+        <button id="testSpinBtn">Тестовая прокрутка рулетки</button>
+        <button id="testSoundBtn">Проверить звук победы</button>
+      </div>
+    </div>
+
+    <div class="progressOnlySection">
+      <h3>Тест</h3>
+      <div class="row">
+        <input type="number" id="testAmount" value="100" min="1">
+        <button id="testDonateBtn">Тестовый донат</button>
+      </div>
+      <div class="row">
+        <button id="resetProgressBtn">Сбросить прогресс</button>
+        <button id="toggleStatusBtn">Показывать статус соединения</button>
+      </div>
+    </div>
+
+    <h3>Экспорт / импорт настроек</h3>
+    <div class="muted">Чтобы перенести настройки (включая вход) между браузером и OBS: настройте всё здесь, нажмите «Экспорт», скопируйте текст, вставьте в поле ниже внутри OBS (режим Interact) и нажмите «Импорт».</div>
+    <textarea id="ioBox" placeholder="JSON настроек появится здесь после экспорта"></textarea>
+    <div class="row">
+      <button id="exportBtn">Экспорт</button>
+      <button id="importBtn">Импорт</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  const STORE_KEY = "da_roulette_cfg_v2";
+  const SPIN_TRIGGER_KEY = "da_roulette_spin_trigger_v1";
+  const SPIN_RESULT_KEY = "da_roulette_spin_result_v1";
+
+  const urlParams = new URLSearchParams(location.search);
+  const viewMode = urlParams.get("view"); // null/other = full widget, "progress", "roulette"
+  const hasProgressUI = viewMode !== "roulette";
+  const hasRouletteUI = viewMode !== "progress";
+
+  const RARITY_LEVELS = [
+    {key:"common",    label:"Обычная",     color:"#c9c9c9", defaultWeight:50},
+    {key:"uncommon",  label:"Необычная",   color:"#4caf50", defaultWeight:25},
+    {key:"rare",      label:"Редкая",      color:"#2e9eff", defaultWeight:12},
+    {key:"epic",      label:"Эпическая",   color:"#b24bf3", defaultWeight:6},
+    {key:"legendary", label:"Легендарная", color:"#ff9800", defaultWeight:3},
+    {key:"artifact",  label:"Артефакт",    color:"#ff2d55", defaultWeight:1}
+  ];
+  const RARITY_BY_KEY = Object.fromEntries(RARITY_LEVELS.map(r => [r.key, r]));
+
+  const DEFAULT_CATEGORIES = [
+    {id:1, name:"Стандартная категория", rarity:"common", tasksText:"Приседания x10, Спать, Шот", enabled:true},
+    {id:2, name:"Новая категория", rarity:"rare", tasksText:"Сменить ник на донатера, Играть на новом герое", enabled:true},
+    {id:3, name:"Новая категория", rarity:"legendary", tasksText:"Спеть песню про донатера", enabled:true}
+  ];
+
+  function defaultRarityWeights(){
+    const w = {};
+    RARITY_LEVELS.forEach(r => w[r.key] = r.defaultWeight);
+    return w;
+  }
+
+  function defaultConfig(){
+    return {
+      clientId: "",
+      accessToken: "",
+      tokenExpiresAt: 0,
+      userId: null,
+      goal: 1000,
+      currency: "₽",
+      carryOver: false,
+      progressTitle: "ДО РУЛЕТКИ",
+      rouletteTitle: "КРУТИМ КРУТИМ КРУТИМ",
+      rouletteAccent: "#ff6a3d",
+      spinDuration: 6,
+      winHold: 5,
+      muteSound: false,
+      soundVolume: 80,
+      showStatus: false,
+      progress: 0,
+      pendingSpinId: null,
+      categories: DEFAULT_CATEGORIES.map(c => Object.assign({}, c)),
+      rarityWeights: defaultRarityWeights()
+    };
+  }
+
+  function loadConfig(){
+    try{
+      const raw = localStorage.getItem(STORE_KEY);
+      if(!raw) return defaultConfig();
+      const parsed = JSON.parse(raw);
+      const merged = Object.assign(defaultConfig(), parsed);
+      merged.rarityWeights = Object.assign(defaultRarityWeights(), parsed.rarityWeights || {});
+      return merged;
+    }catch(e){
+      return defaultConfig();
+    }
+  }
+
+  let cfg = loadConfig();
+
+  function saveConfig(){
+    localStorage.setItem(STORE_KEY, JSON.stringify(cfg));
+  }
+
+  // ---------- DOM refs ----------
+  const progressWrap = document.getElementById("progressWrap");
+  const progressTitleEl = document.getElementById("progressTitle");
+  const progressAmountFill = document.getElementById("progressAmountFill");
+  const progressText = document.getElementById("progressText");
+  const rouletteWrap = document.getElementById("rouletteWrap");
+  const rouletteTitleEl = document.getElementById("rouletteTitle");
+  const reelViewport = document.getElementById("reelViewport");
+  const reelTrack = document.getElementById("reelTrack");
+  const winBanner = document.getElementById("winBanner");
+  const statusDot = document.getElementById("statusDot");
+  const gearBtn = document.getElementById("gearBtn");
+  const settingsPanel = document.getElementById("settingsPanel");
+
+  const cfgClientId = document.getElementById("cfgClientId");
+  const redirectUriShow = document.getElementById("redirectUriShow");
+  const loginBtn = document.getElementById("loginBtn");
+  const logoutBtn = document.getElementById("logoutBtn");
+  const authStatus = document.getElementById("authStatus");
+  const cfgProgressTitle = document.getElementById("cfgProgressTitle");
+  const cfgGoal = document.getElementById("cfgGoal");
+  const cfgCurrency = document.getElementById("cfgCurrency");
+  const cfgCarryOver = document.getElementById("cfgCarryOver");
+  const cfgRouletteTitle = document.getElementById("cfgRouletteTitle");
+  const cfgSpinDuration = document.getElementById("cfgSpinDuration");
+  const cfgWinHold = document.getElementById("cfgWinHold");
+  const cfgRouletteAccent = document.getElementById("cfgRouletteAccent");
+  const categoriesGrid = document.getElementById("categoriesGrid");
+  const addCategoryBtn = document.getElementById("addCategoryBtn");
+  const rarityWeightsGrid = document.getElementById("rarityWeightsGrid");
+  const cfgMuteSound = document.getElementById("cfgMuteSound");
+  const cfgSoundVolume = document.getElementById("cfgSoundVolume");
+  const testAmount = document.getElementById("testAmount");
+  const testDonateBtn = document.getElementById("testDonateBtn");
+  const testSpinBtn = document.getElementById("testSpinBtn");
+  const testSoundBtn = document.getElementById("testSoundBtn");
+  const resetProgressBtn = document.getElementById("resetProgressBtn");
+  const toggleStatusBtn = document.getElementById("toggleStatusBtn");
+  const exportBtn = document.getElementById("exportBtn");
+  const importBtn = document.getElementById("importBtn");
+  const ioBox = document.getElementById("ioBox");
+
+  const redirectUri = location.origin + location.pathname;
+  redirectUriShow.value = redirectUri;
+
+  document.body.classList.toggle("noProgress", !hasProgressUI);
+  document.body.classList.toggle("noRoulette", !hasRouletteUI);
+
+  // ---------- cross-document sync (localStorage is shared between OBS browser sources of the same origin) ----------
+  const watchers = {};
+  function watchKey(key, cb){
+    (watchers[key] = watchers[key] || []).push({ lastSeen: localStorage.getItem(key), cb });
+  }
+  function pollWatchers(){
+    Object.keys(watchers).forEach(key => {
+      const cur = localStorage.getItem(key);
+      watchers[key].forEach(w => { if(w.lastSeen !== cur){ w.lastSeen = cur; w.cb(cur); } });
+    });
+  }
+  setInterval(pollWatchers, 300);
+  window.addEventListener("storage", (e) => { if(e.key && watchers[e.key]) pollWatchers(); });
+  function writeKey(key, value){
+    localStorage.setItem(key, value);
+    pollWatchers();
+  }
+
+  // ---------- synthesized sound (no external audio files, nothing generic) ----------
+  let audioCtx = null;
+  function ensureAudio(){
+    if(!audioCtx){
+      try{ audioCtx = new (window.AudioContext || window.webkitAudioContext)(); }catch(e){ return null; }
+    }
+    if(audioCtx.state === "suspended") audioCtx.resume().catch(()=>{});
+    return audioCtx;
+  }
+  function soundGain(){ return cfg.muteSound ? 0 : Math.max(0, Math.min(1, (cfg.soundVolume||0)/100)); }
+
+  // short percussive click as each reel item passes the marker; strength 0..1 (loud/bright early, soft/dull as the spin settles)
+  function playTick(strength){
+    const vol = soundGain();
+    const ctx = ensureAudio();
+    if(!ctx || vol <= 0) return;
+    const t0 = ctx.currentTime;
+    const freq = 620 + strength*950;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = "triangle";
+    osc.frequency.setValueAtTime(freq, t0);
+    osc.frequency.exponentialRampToValueAtTime(Math.max(90, freq*0.35), t0+0.05);
+    gain.gain.setValueAtTime(0, t0);
+    gain.gain.linearRampToValueAtTime(0.22*vol*(0.35+0.65*strength), t0+0.004);
+    gain.gain.exponentialRampToValueAtTime(0.0008, t0+0.06);
+    osc.connect(gain).connect(ctx.destination);
+    osc.start(t0); osc.stop(t0+0.07);
+  }
+
+  // airy noise sweep at the moment the reel starts spinning
+  function playWhoosh(){
+    const vol = soundGain();
+    const ctx = ensureAudio();
+    if(!ctx || vol <= 0) return;
+    const t0 = ctx.currentTime;
+    const dur = 0.4;
+    const buffer = ctx.createBuffer(1, Math.ceil(ctx.sampleRate*dur), ctx.sampleRate);
+    const data = buffer.getChannelData(0);
+    for(let i=0;i<data.length;i++) data[i] = (Math.random()*2-1) * (1 - i/data.length);
+    const noise = ctx.createBufferSource();
+    noise.buffer = buffer;
+    const filt = ctx.createBiquadFilter();
+    filt.type = "bandpass"; filt.Q.value = 0.7;
+    filt.frequency.setValueAtTime(200, t0);
+    filt.frequency.exponentialRampToValueAtTime(2600, t0+dur*0.85);
+    const gain = ctx.createGain();
+    gain.gain.setValueAtTime(0.0001, t0);
+    gain.gain.linearRampToValueAtTime(0.22*vol, t0+0.05);
+    gain.gain.exponentialRampToValueAtTime(0.0005, t0+dur);
+    noise.connect(filt).connect(gain).connect(ctx.destination);
+    noise.start(t0); noise.stop(t0+dur);
+  }
+
+  // bright ascending arpeggio + a shimmering sustained chord — a small fanfare, not a stock "ding"
+  function playWin(){
+    const vol = soundGain();
+    const ctx = ensureAudio();
+    if(!ctx || vol <= 0) return;
+    const t0 = ctx.currentTime;
+    const arpeggio = [523.25, 659.25, 783.99, 1046.50]; // C5 E5 G5 C6
+    arpeggio.forEach((freq, i) => {
+      const start = t0 + i*0.09;
+      const osc = ctx.createOscillator();
+      const osc2 = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = "triangle"; osc2.type = "sine"; osc2.detune.value = 7;
+      osc.frequency.value = freq; osc2.frequency.value = freq;
+      gain.gain.setValueAtTime(0, start);
+      gain.gain.linearRampToValueAtTime(0.24*vol, start+0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0008, start+0.5);
+      osc.connect(gain); osc2.connect(gain); gain.connect(ctx.destination);
+      osc.start(start); osc.stop(start+0.52);
+      osc2.start(start); osc2.stop(start+0.52);
+    });
+    const chordStart = t0 + arpeggio.length*0.09 + 0.04;
+    [523.25, 659.25, 783.99, 1046.50, 1318.51].forEach((freq) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      const filt = ctx.createBiquadFilter();
+      osc.type = "sawtooth";
+      osc.frequency.value = freq;
+      filt.type = "lowpass"; filt.frequency.value = 3200;
+      gain.gain.setValueAtTime(0, chordStart);
+      gain.gain.linearRampToValueAtTime(0.1*vol, chordStart+0.05);
+      gain.gain.exponentialRampToValueAtTime(0.0006, chordStart+1.1);
+      osc.connect(filt).connect(gain).connect(ctx.destination);
+      osc.start(chordStart); osc.stop(chordStart+1.15);
+    });
+  }
+
+  function applyTitles(){
+    progressTitleEl.textContent = cfg.progressTitle || "ДО РУЛЕТКИ";
+    rouletteTitleEl.textContent = cfg.rouletteTitle || "КРУТИМ КРУТИМ КРУТИМ";
+    document.documentElement.style.setProperty("--roulette-accent", cfg.rouletteAccent || "#ff6a3d");
+  }
+
+  // ---------- settings panel open/close ----------
+  gearBtn.addEventListener("click", () => {
+    settingsPanel.classList.toggle("open");
+    if(settingsPanel.classList.contains("open")) renderSettingsForm();
+    ensureAudio(); // a click is a user gesture — unlocks autoplay for later automatic spins
+  });
+
+  function renderSettingsForm(){
+    cfgClientId.value = cfg.clientId || "";
+    cfgProgressTitle.value = cfg.progressTitle;
+    cfgGoal.value = cfg.goal;
+    cfgCurrency.value = cfg.currency;
+    cfgCarryOver.checked = !!cfg.carryOver;
+    cfgRouletteTitle.value = cfg.rouletteTitle;
+    cfgSpinDuration.value = cfg.spinDuration;
+    cfgWinHold.value = cfg.winHold;
+    cfgRouletteAccent.value = cfg.rouletteAccent;
+    cfgMuteSound.checked = !!cfg.muteSound;
+    cfgSoundVolume.value = cfg.soundVolume;
+    toggleStatusBtn.textContent = cfg.showStatus ? "Скрыть статус соединения" : "Показывать статус соединения";
+    renderRarityWeights();
+    renderCategories();
+    renderAuthStatus();
+    applyTitles();
+  }
+
+  function renderAuthStatus(){
+    if(cfg.accessToken && cfg.tokenExpiresAt > Date.now()){
+      authStatus.textContent = "подключено, user_id=" + (cfg.userId || "?");
+      authStatus.className = "ok";
+    } else if(cfg.accessToken){
+      authStatus.textContent = "токен истёк — войдите заново";
+      authStatus.className = "bad";
+    } else {
+      authStatus.textContent = "не подключено";
+      authStatus.className = "";
+    }
+  }
+
+  function escapeHtml(s){
+    return String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+  }
+
+  function parseTasks(text){
+    return String(text||"").split(",").map(s=>s.trim()).filter(Boolean);
+  }
+
+  function rarityOptionsHtml(selected){
+    return RARITY_LEVELS.map(r =>
+      `<option value="${r.key}" ${r.key===selected?"selected":""}>${r.label}</option>`
+    ).join("");
+  }
+
+  function renderRarityWeights(){
+    rarityWeightsGrid.innerHTML = "";
+    RARITY_LEVELS.forEach(r => {
+      const row = document.createElement("div");
+      row.className = "rarityWeightRow";
+      row.innerHTML = `
+        <span class="rwLabel" style="color:${r.color}">${r.label}</span>
+        <input type="number" min="0" step="0.5" data-rarity="${r.key}" value="${cfg.rarityWeights[r.key]}">
+      `;
+      rarityWeightsGrid.appendChild(row);
+    });
+  }
+
+  rarityWeightsGrid.addEventListener("input", (e) => {
+    const t = e.target;
+    const key = t.dataset.rarity;
+    if(!key) return;
+    cfg.rarityWeights[key] = Number(t.value) || 0;
+    saveConfig();
+    renderCategories();
+  });
+
+  function categoryWeightPool(){
+    // enabled categories with at least one parsed task, each weighted by its rarity
+    return cfg.categories
+      .filter(c => c.enabled && parseTasks(c.tasksText).length > 0)
+      .map(c => ({ cat: c, weight: Math.max(0, Number(cfg.rarityWeights[c.rarity]) || 0) }))
+      .filter(entry => entry.weight > 0);
+  }
+
+  function renderCategories(){
+    categoriesGrid.innerHTML = "";
+    const pool = categoryWeightPool();
+    const totalWeight = pool.reduce((s,e)=>s+e.weight,0);
+
+    cfg.categories.forEach((cat, idx) => {
+      const rarity = RARITY_BY_KEY[cat.rarity] || RARITY_LEVELS[0];
+      const taskCount = parseTasks(cat.tasksText).length;
+      const poolEntry = pool.find(e => e.cat === cat);
+      let chanceText;
+      if(!cat.enabled) chanceText = "категория выключена";
+      else if(taskCount === 0) chanceText = "нет заданий — впишите через запятую";
+      else if(poolEntry && totalWeight > 0) chanceText = `шанс категории: ${(100*poolEntry.weight/totalWeight).toFixed(1)}% · заданий: ${taskCount}`;
+      else chanceText = "вес редкости равен 0 — выпадать не будет";
+
+      const card = document.createElement("div");
+      card.className = "catCard" + (cat.enabled ? "" : " catDisabled");
+      card.style.setProperty("--cat-color", rarity.color);
+      card.innerHTML = `
+        <div class="catHeader">
+          <input type="text" class="catName" data-idx="${idx}" data-field="name" value="${escapeHtml(cat.name)}">
+          <button class="catIconBtn" data-idx="${idx}" data-action="toggle" title="${cat.enabled ? "Выключить категорию" : "Включить категорию"}">${cat.enabled ? "👁" : "🚫"}</button>
+          <button class="catIconBtn danger" data-idx="${idx}" data-action="del" title="Удалить категорию">✕</button>
+        </div>
+        <select class="catRarity" data-idx="${idx}" data-field="rarity" style="color:${rarity.color}">
+          ${rarityOptionsHtml(cat.rarity)}
+        </select>
+        <label class="catTasksLabel">Задания через запятую</label>
+        <textarea class="catTasks" data-idx="${idx}" data-field="tasksText" placeholder="Задание 1, Задание 2, Задание 3">${escapeHtml(cat.tasksText)}</textarea>
+        <div class="muted catChance">${chanceText}</div>
+      `;
+      categoriesGrid.appendChild(card);
+    });
+  }
+
+  categoriesGrid.addEventListener("input", (e) => {
+    const t = e.target;
+    const idx = Number(t.dataset.idx);
+    const field = t.dataset.field;
+    if(field == null || Number.isNaN(idx)) return;
+    cfg.categories[idx][field] = t.value;
+    saveConfig();
+    if(field === "rarity"){
+      renderCategories();
+    } else {
+      // keep focus while typing name/tasks: only refresh the chance hint text, not the whole grid
+      const card = categoriesGrid.children[idx];
+      if(card){
+        card.classList.toggle("catDisabled", !cfg.categories[idx].enabled);
+      }
+      refreshChanceHints();
+    }
+  });
+
+  function refreshChanceHints(){
+    const pool = categoryWeightPool();
+    const totalWeight = pool.reduce((s,e)=>s+e.weight,0);
+    cfg.categories.forEach((cat, idx) => {
+      const card = categoriesGrid.children[idx];
+      if(!card) return;
+      const hintEl = card.querySelector(".catChance");
+      if(!hintEl) return;
+      const taskCount = parseTasks(cat.tasksText).length;
+      const poolEntry = pool.find(e => e.cat === cat);
+      if(!cat.enabled) hintEl.textContent = "категория выключена";
+      else if(taskCount === 0) hintEl.textContent = "нет заданий — впишите через запятую";
+      else if(poolEntry && totalWeight > 0) hintEl.textContent = `шанс категории: ${(100*poolEntry.weight/totalWeight).toFixed(1)}% · заданий: ${taskCount}`;
+      else hintEl.textContent = "вес редкости равен 0 — выпадать не будет";
+    });
+  }
+
+  categoriesGrid.addEventListener("click", (e) => {
+    const t = e.target.closest("[data-action]");
+    if(!t) return;
+    const idx = Number(t.dataset.idx);
+    if(Number.isNaN(idx)) return;
+    if(t.dataset.action === "del"){
+      cfg.categories.splice(idx, 1);
+      renderCategories();
+      saveConfig();
+    } else if(t.dataset.action === "toggle"){
+      cfg.categories[idx].enabled = !cfg.categories[idx].enabled;
+      renderCategories();
+      saveConfig();
+    }
+  });
+
+  addCategoryBtn.addEventListener("click", () => {
+    cfg.categories.push({
+      id: Date.now(),
+      name: "Новая категория",
+      rarity: "common",
+      tasksText: "",
+      enabled: true
+    });
+    renderCategories();
+    saveConfig();
+  });
+
+  cfgClientId.addEventListener("change", () => { cfg.clientId = cfgClientId.value.trim(); saveConfig(); });
+  cfgProgressTitle.addEventListener("input", () => { cfg.progressTitle = cfgProgressTitle.value || "ДО РУЛЕТКИ"; saveConfig(); applyTitles(); });
+  cfgGoal.addEventListener("change", () => { cfg.goal = Math.max(1, Number(cfgGoal.value)||1000); saveConfig(); updateProgressUI(); });
+  cfgCurrency.addEventListener("change", () => { cfg.currency = cfgCurrency.value || "₽"; saveConfig(); updateProgressUI(); });
+  cfgCarryOver.addEventListener("change", () => { cfg.carryOver = cfgCarryOver.checked; saveConfig(); });
+  cfgRouletteTitle.addEventListener("input", () => { cfg.rouletteTitle = cfgRouletteTitle.value || "КРУТИМ КРУТИМ КРУТИМ"; saveConfig(); applyTitles(); });
+  cfgSpinDuration.addEventListener("change", () => { cfg.spinDuration = Number(cfgSpinDuration.value)||6; saveConfig(); });
+  cfgWinHold.addEventListener("change", () => { cfg.winHold = Number(cfgWinHold.value)||5; saveConfig(); });
+  cfgRouletteAccent.addEventListener("input", () => { cfg.rouletteAccent = cfgRouletteAccent.value || "#ff6a3d"; saveConfig(); applyTitles(); });
+  cfgMuteSound.addEventListener("change", () => { cfg.muteSound = cfgMuteSound.checked; saveConfig(); });
+  cfgSoundVolume.addEventListener("input", () => { cfg.soundVolume = Number(cfgSoundVolume.value)||0; saveConfig(); });
+
+  toggleStatusBtn.addEventListener("click", () => {
+    cfg.showStatus = !cfg.showStatus;
+    document.body.classList.toggle("showStatus", cfg.showStatus);
+    toggleStatusBtn.textContent = cfg.showStatus ? "Скрыть статус соединения" : "Показывать статус соединения";
+    saveConfig();
+  });
+
+  resetProgressBtn.addEventListener("click", () => {
+    cfg.progress = 0;
+    saveConfig();
+    updateProgressUI();
+  });
+
+  // ---------- export / import ----------
+  exportBtn.addEventListener("click", () => {
+    ioBox.value = JSON.stringify(cfg, null, 2);
+    ioBox.select();
+  });
+  importBtn.addEventListener("click", () => {
+    try{
+      const parsed = JSON.parse(ioBox.value);
+      cfg = Object.assign(defaultConfig(), parsed);
+      cfg.rarityWeights = Object.assign(defaultRarityWeights(), parsed.rarityWeights || {});
+      saveConfig();
+      renderSettingsForm();
+      updateProgressUI();
+      document.body.classList.toggle("showStatus", cfg.showStatus);
+      if(hasProgressUI) connectRealtime();
+      alert("Настройки импортированы");
+    }catch(e){
+      alert("Не получилось разобрать JSON: " + e.message);
+    }
+  });
+
+  // ---------- OAuth ----------
+  loginBtn.addEventListener("click", () => {
+    const clientId = cfgClientId.value.trim();
+    if(!clientId){ alert("Сначала укажите Client ID приложения"); return; }
+    cfg.clientId = clientId; saveConfig();
+    const scope = encodeURIComponent("oauth-user-show oauth-donation-subscribe oauth-donation-index");
+    const url = `https://www.donationalerts.com/oauth/authorize?client_id=${encodeURIComponent(clientId)}`
+      + `&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=token&scope=${scope}`;
+    location.href = url;
+  });
+
+  logoutBtn.addEventListener("click", () => {
+    cfg.accessToken = ""; cfg.tokenExpiresAt = 0; cfg.userId = null;
+    saveConfig();
+    renderAuthStatus();
+    setStatus("err");
+    if(ws) try{ ws.close(); }catch(e){}
+  });
+
+  function parseAuthHash(){
+    if(!location.hash || location.hash.length < 2) return;
+    const params = new URLSearchParams(location.hash.slice(1));
+    const token = params.get("access_token");
+    if(token){
+      cfg.accessToken = token;
+      const expiresIn = Number(params.get("expires_in")) || 3600*24*30;
+      cfg.tokenExpiresAt = Date.now() + expiresIn*1000;
+      saveConfig();
+      history.replaceState(null, "", location.pathname + location.search);
+    }
+  }
+  parseAuthHash();
+
+  // ---------- test donation / test spin ----------
+  testDonateBtn.addEventListener("click", () => {
+    const amount = Number(testAmount.value) || 0;
+    if(amount <= 0) return;
+    addDonation(amount);
+  });
+  testSpinBtn.addEventListener("click", () => {
+    runSpin(null);
+  });
+  testSoundBtn.addEventListener("click", () => {
+    ensureAudio();
+    playWin();
+  });
+
+  // ---------- progress + roulette core ----------
+  function updateProgressUI(){
+    const pct = Math.min(100, (cfg.progress / cfg.goal) * 100);
+    progressAmountFill.style.width = pct + "%";
+    progressText.textContent = `${Math.floor(cfg.progress)} / ${cfg.goal} ${cfg.currency}`;
+  }
+
+  function addDonation(amount){
+    if(cfg.progress >= cfg.goal) return; // already awaiting / running a spin
+    cfg.progress += amount;
+    saveConfig();
+    updateProgressUI();
+    if(cfg.progress >= cfg.goal){
+      setTimeout(triggerSpin, 400);
+    }
+  }
+
+  let spinSafetyTimer = null;
+
+  // called by the collection widget once the goal is reached: hands off to whichever
+  // roulette widget (same page in "full" mode, or a separate OBS source) is listening
+  function triggerSpin(){
+    if(hasProgressUI) progressWrap.classList.add("hidden");
+    const id = Date.now() + "_" + Math.random().toString(36).slice(2);
+    cfg.pendingSpinId = id;
+    saveConfig();
+    writeKey(SPIN_TRIGGER_KEY, id);
+    clearTimeout(spinSafetyTimer);
+    // self-heals if no roulette widget ever acknowledges (e.g. it wasn't added in OBS)
+    spinSafetyTimer = setTimeout(() => {
+      if(cfg.pendingSpinId === id) resumeAfterSpin(id);
+    }, (cfg.spinDuration + cfg.winHold + 15) * 1000);
+  }
+
+  function resumeAfterSpin(id){
+    if(cfg.pendingSpinId !== id) return;
+    cfg.pendingSpinId = null;
+    cfg.progress = cfg.carryOver ? Math.max(0, cfg.progress - cfg.goal) : 0;
+    saveConfig();
+    if(hasProgressUI){
+      progressWrap.classList.remove("hidden");
+      updateProgressUI();
+    }
+  }
+
+  if(hasProgressUI){
+    watchKey(SPIN_RESULT_KEY, (val) => { if(val) resumeAfterSpin(val); });
+  }
+
+  function pickWeightedCategory(pool){
+    const total = pool.reduce((s,e)=>s+e.weight,0);
+    let r = Math.random() * total;
+    for(const entry of pool){
+      r -= entry.weight;
+      if(r <= 0) return entry.cat;
+    }
+    return pool[pool.length-1].cat;
+  }
+
+  function pickOutcome(){
+    const pool = categoryWeightPool();
+    if(!pool.length) return null;
+    const cat = pickWeightedCategory(pool);
+    const tasks = parseTasks(cat.tasksText);
+    const text = tasks[Math.floor(Math.random()*tasks.length)];
+    const color = (RARITY_BY_KEY[cat.rarity] || RARITY_LEVELS[0]).color;
+    return { text, color, categoryName: cat.name };
+  }
+
+  const ITEM_WIDTH = 132;
+  const ITEM_GAP = 10;
+  const ITEM_STEP = ITEM_WIDTH + ITEM_GAP;
+  const REPEAT_COUNT = 40;
+
+  // triggerId is the id written by the collection widget via SPIN_TRIGGER_KEY, or null
+  // for a local test spin (testSpinBtn) that doesn't need to report back to anyone.
+  function runSpin(triggerId){
+    const winner = pickOutcome();
+    if(!winner) { finishRouletteVisual(triggerId); return; }
+
+    // build long strip of random outcomes sampled the same way as the real draw
+    reelTrack.innerHTML = "";
+    const sequence = [];
+    for(let i=0;i<REPEAT_COUNT;i++){
+      sequence.push(pickOutcome() || winner);
+    }
+    // force a winner instance near the end so we can land exactly on it
+    const winIndex = REPEAT_COUNT - 4;
+    sequence[winIndex] = winner;
+
+    sequence.forEach((item, idx) => {
+      const div = document.createElement("div");
+      div.className = "reelItem";
+      div.style.width = ITEM_WIDTH + "px";
+      div.style.borderColor = item.color;
+      div.style.boxShadow = `0 0 10px ${hexToRgba(item.color, 0.55)}`;
+      div.textContent = item.text;
+      div.dataset.idx = idx;
+      reelTrack.appendChild(div);
+    });
+
+    rouletteWrap.classList.add("visible");
+    winBanner.classList.remove("show");
+    winBanner.textContent = "";
+    playWhoosh();
+
+    // layout settles next frame before animating
+    requestAnimationFrame(() => {
+      const viewportWidth = reelViewport.clientWidth;
+      const targetX = -(winIndex * ITEM_STEP + ITEM_WIDTH/2 - viewportWidth/2);
+      reelTrack.style.transform = "translateX(0px)";
+      void reelTrack.offsetWidth; // force reflow before the rAF loop takes over
+      animateReel(0, targetX, cfg.spinDuration*1000, () => {
+        const winEl = reelTrack.children[winIndex];
+        if(winEl) winEl.classList.add("win");
+        winBanner.textContent = "Выпало: " + winner.text;
+        winBanner.classList.add("show");
+        playWin();
+        setTimeout(() => finishRouletteVisual(triggerId), cfg.winHold*1000);
+      });
+    });
+  }
+
+  // custom ease: quick ramp-up, a cruise, then a long deceleration — like a real wheel settling
+  function spinEase(p){
+    if(p < 0.12) return (p/0.12) * 0.07;
+    if(p < 0.5) return 0.07 + ((p-0.12)/0.38) * 0.53;
+    const q = (p-0.5)/0.5;
+    return 0.60 + 0.40 * (1 - Math.pow(1-q, 3));
+  }
+
+  // drives the reel transform frame by frame (instead of a CSS transition) so a tick
+  // sound can fire exactly when a new item crosses the marker
+  function animateReel(fromX, toX, durationMs, onDone){
+    const start = performance.now();
+    let lastIndex = null;
+    function frame(now){
+      const t = Math.min(1, (now-start)/durationMs);
+      const x = fromX + (toX-fromX) * spinEase(t);
+      reelTrack.style.transform = `translateX(${x}px)`;
+
+      const viewportWidth = reelViewport.clientWidth;
+      const idx = Math.floor((viewportWidth/2 - x) / ITEM_STEP);
+      if(lastIndex !== null && idx !== lastIndex){
+        playTick(Math.max(0, 1 - t*1.05));
+      }
+      lastIndex = idx;
+
+      if(t < 1) requestAnimationFrame(frame);
+      else onDone && onDone();
+    }
+    requestAnimationFrame(frame);
+  }
+
+  function hexToRgba(hex, alpha){
+    const h = hex.replace("#","");
+    const bigint = parseInt(h.length===3 ? h.split("").map(c=>c+c).join("") : h, 16);
+    const r = (bigint>>16)&255, g=(bigint>>8)&255, b=bigint&255;
+    return `rgba(${r},${g},${b},${alpha})`;
+  }
+
+  // hides the reel and, if this spin was requested by a collection widget (local or
+  // remote via localStorage), reports back so it can resume/reset its progress
+  function finishRouletteVisual(triggerId){
+    rouletteWrap.classList.remove("visible");
+    if(triggerId) writeKey(SPIN_RESULT_KEY, triggerId);
+  }
+
+  if(hasRouletteUI){
+    watchKey(SPIN_TRIGGER_KEY, (val) => { if(val) runSpin(val); });
+  }
+
+  // ---------- DonationAlerts realtime (Centrifugo) ----------
+  let ws = null;
+  let reconnectDelay = 1000;
+  let msgId = 1;
+  let reconnectTimer = null;
+
+  function setStatus(level){
+    statusDot.className = level;
+  }
+
+  async function connectRealtime(){
+    if(!cfg.accessToken){ setStatus("err"); return; }
+    if(cfg.tokenExpiresAt && cfg.tokenExpiresAt < Date.now()){ setStatus("err"); return; }
+    setStatus("warn");
+    try{
+      const userResp = await fetch("https://www.donationalerts.com/api/v1/user/oauth", {
+        headers: { Authorization: "Bearer " + cfg.accessToken }
+      });
+      if(!userResp.ok) throw new Error("user/oauth " + userResp.status);
+      const userJson = await userResp.json();
+      const socketToken = userJson.data.socket_connection_token;
+      cfg.userId = userJson.data.id;
+      saveConfig();
+      renderAuthStatus();
+      openSocket(socketToken, cfg.userId);
+    }catch(e){
+      console.error("DA auth error", e);
+      setStatus("err");
+      scheduleReconnect();
+    }
+  }
+
+  function openSocket(socketToken, userId){
+    if(ws){ try{ ws.close(); }catch(e){} }
+    ws = new WebSocket("wss://centrifugo.donationalerts.com/connection/websocket");
+    let clientId = null;
+
+    ws.addEventListener("open", () => {
+      ws.send(JSON.stringify({ params: { token: socketToken }, id: msgId++ }));
+    });
+
+    ws.addEventListener("message", async (ev) => {
+      let data;
+      try{ data = JSON.parse(ev.data); }catch(e){ return; }
+
+      if(data.result && data.result.client && !clientId){
+        clientId = data.result.client;
+        try{
+          const subResp = await fetch("https://www.donationalerts.com/api/v1/centrifuge/subscribe", {
+            method:"POST",
+            headers:{ Authorization:"Bearer "+cfg.accessToken, "Content-Type":"application/json" },
+            body: JSON.stringify({ channels:["$alerts:donation_"+userId], client: clientId })
+          });
+          const subJson = await subResp.json();
+          const channelToken = subJson.channels && subJson.channels[0] && subJson.channels[0].token;
+          if(!channelToken) throw new Error("no channel token");
+          ws.send(JSON.stringify({
+            params:{ channel: "$alerts:donation_"+userId, token: channelToken },
+            method: 1, id: msgId++
+          }));
+        }catch(e){
+          console.error("subscribe error", e);
+          setStatus("err");
+          scheduleReconnect();
+        }
+        return;
+      }
+
+      if(data.result && data.result.channel){
+        setStatus("ok");
+        reconnectDelay = 1000;
+        return;
+      }
+
+      if(data.result && data.result.data){
+        const payload = data.result.data;
+        handleDonationEvent(payload);
+      }
+    });
+
+    ws.addEventListener("close", () => {
+      setStatus("err");
+      scheduleReconnect();
+    });
+    ws.addEventListener("error", () => {
+      setStatus("err");
+    });
+  }
+
+  function handleDonationEvent(payload){
+    // payload may be wrapped as {info:{...}} (subscribe ack) or the actual alert
+    const alert = payload.alert || payload;
+    const amount = Number(alert.amount);
+    if(!amount || Number.isNaN(amount)) return;
+    addDonation(amount);
+  }
+
+  function scheduleReconnect(){
+    if(reconnectTimer) return;
+    reconnectTimer = setTimeout(() => {
+      reconnectTimer = null;
+      reconnectDelay = Math.min(30000, reconnectDelay*1.7);
+      connectRealtime();
+    }, reconnectDelay);
+  }
+
+  // ---------- init ----------
+  document.body.classList.toggle("showStatus", cfg.showStatus);
+  updateProgressUI();
+  renderSettingsForm();
+  // only the widget that shows the collection card owns the realtime connection,
+  // so a roulette-only widget never double-counts the same donation
+  if(hasProgressUI) connectRealtime();
+})();
+</script>
+</body>
+</html>
