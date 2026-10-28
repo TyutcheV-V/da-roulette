@@ -288,6 +288,9 @@
         </div>
       </div>
       <label><input type="checkbox" id="cfgCarryOver" style="width:auto;"> переносить остаток сверх цели на новый круг</label>
+      <label>Увеличивать цель после каждого круга на</label>
+      <input type="number" id="cfgGoalIncrement" value="0" min="0" step="1">
+      <div class="muted">Например: цель 1000, шаг 50 — после первой рулетки цель станет 1050, после второй 1100 и так далее. 0 — цель не меняется.</div>
     </div>
 
     <div class="rouletteOnlySection">
@@ -390,7 +393,8 @@
       userId: null,
       goal: 1000,
       currency: "₽",
-      carryOver: false,
+      carryOver: true,
+      goalIncrement: 0,
       progressTitle: "ДО РУЛЕТКИ",
       rouletteTitle: "КРУТИМ КРУТИМ КРУТИМ",
       rouletteAccent: "#ff6a3d",
@@ -448,6 +452,7 @@
   const cfgGoal = document.getElementById("cfgGoal");
   const cfgCurrency = document.getElementById("cfgCurrency");
   const cfgCarryOver = document.getElementById("cfgCarryOver");
+  const cfgGoalIncrement = document.getElementById("cfgGoalIncrement");
   const cfgRouletteTitle = document.getElementById("cfgRouletteTitle");
   const cfgSpinDuration = document.getElementById("cfgSpinDuration");
   const cfgWinHold = document.getElementById("cfgWinHold");
@@ -602,6 +607,7 @@
     cfgGoal.value = cfg.goal;
     cfgCurrency.value = cfg.currency;
     cfgCarryOver.checked = !!cfg.carryOver;
+    cfgGoalIncrement.value = cfg.goalIncrement;
     cfgRouletteTitle.value = cfg.rouletteTitle;
     cfgSpinDuration.value = cfg.spinDuration;
     cfgWinHold.value = cfg.winHold;
@@ -776,6 +782,7 @@
   cfgGoal.addEventListener("change", () => { cfg.goal = Math.max(1, Number(cfgGoal.value)||1000); saveConfig(); updateProgressUI(); });
   cfgCurrency.addEventListener("change", () => { cfg.currency = cfgCurrency.value || "₽"; saveConfig(); updateProgressUI(); });
   cfgCarryOver.addEventListener("change", () => { cfg.carryOver = cfgCarryOver.checked; saveConfig(); });
+  cfgGoalIncrement.addEventListener("change", () => { cfg.goalIncrement = Math.max(0, Number(cfgGoalIncrement.value)||0); saveConfig(); });
   cfgRouletteTitle.addEventListener("input", () => { cfg.rouletteTitle = cfgRouletteTitle.value || "КРУТИМ КРУТИМ КРУТИМ"; saveConfig(); applyTitles(); });
   cfgSpinDuration.addEventListener("change", () => { cfg.spinDuration = Number(cfgSpinDuration.value)||6; saveConfig(); });
   cfgWinHold.addEventListener("change", () => { cfg.winHold = Number(cfgWinHold.value)||5; saveConfig(); });
@@ -902,6 +909,9 @@
     if(cfg.pendingSpinId !== id) return;
     cfg.pendingSpinId = null;
     cfg.progress = cfg.carryOver ? Math.max(0, cfg.progress - cfg.goal) : 0;
+    if(cfg.goalIncrement){
+      cfg.goal = Math.max(1, cfg.goal + Number(cfg.goalIncrement));
+    }
     saveConfig();
     if(hasProgressUI){
       progressWrap.classList.remove("hidden");
