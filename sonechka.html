@@ -40,12 +40,34 @@
     background:var(--card-navy-dark); border:1px solid var(--card-border); border-radius:14px;
     padding:10px 12px 12px; box-shadow:0 8px 26px rgba(0,0,0,.55);
     touch-action:none;
+    animation: petGlow 3.4s ease-in-out infinite;
   }
   #petCard.arrangeMode{
     cursor:move; outline:2px dashed #ff6a3d; outline-offset:4px;
   }
+  /* непрерывное мягкое "дыхание" подсветки по краю — чтобы карточка не
+     выглядела статичной заставкой, а постоянно чуть "жила" */
+  @keyframes petGlow{
+    0%,100%{ box-shadow:0 8px 26px rgba(0,0,0,.55), 0 0 0 rgba(124,77,255,0); }
+    50%{ box-shadow:0 8px 26px rgba(0,0,0,.55), 0 0 18px rgba(124,77,255,.55); }
+  }
+  /* редкий "блик", пробегающий по карточке — как подсветка лута/ивента в играх,
+     чтобы периодически цеплять взгляд, не отвлекая постоянно. Позиционируется
+     как обычный абсолютный слой под содержимым — остальные элементы карточки
+     ниже получают position:relative, чтобы гарантированно рисоваться поверх */
+  #petCard::before{
+    content:""; position:absolute; inset:0; border-radius:14px; pointer-events:none;
+    background:linear-gradient(115deg, transparent 0%, transparent 42%, rgba(255,255,255,.35) 50%, transparent 58%, transparent 100%);
+    background-size:300% 100%; background-position:200% 0;
+    animation: petShine 9s ease-in-out infinite;
+  }
+  @keyframes petShine{
+    0%, 75%{ background-position:200% 0; }
+    88%, 100%{ background-position:-40% 0; }
+  }
 
   #petSpriteWrap{
+    position:relative; /* поверх блика карточки (petShine), не под ним */
     width:120px; height:120px; margin:0 auto 6px; border-radius:50%;
     background:var(--card-navy-light); display:flex; align-items:center; justify-content:center;
     overflow:hidden; border:2px solid var(--card-border);
@@ -53,9 +75,9 @@
   #petSpriteImg{ width:100%; height:100%; object-fit:cover; display:none; }
   #petSpriteFallback{ font-size:56px; line-height:1; }
 
-  #petName{ font-weight:800; font-size:14px; letter-spacing:.03em; margin-bottom:6px; text-transform:uppercase; }
+  #petName{ position:relative; font-weight:800; font-size:14px; letter-spacing:.03em; margin-bottom:6px; text-transform:uppercase; }
 
-  .petBarRow{ display:flex; align-items:center; gap:6px; margin-bottom:4px; }
+  .petBarRow{ position:relative; display:flex; align-items:center; gap:6px; margin-bottom:4px; }
   .petBarLabel{ font-size:13px; width:16px; text-align:center; flex:0 0 auto; }
   .petBarTrack{ flex:1; height:8px; border-radius:4px; background:rgba(255,255,255,.1); overflow:hidden; }
   .petBarFill{ height:100%; border-radius:4px; transition:width .5s ease; }
@@ -64,7 +86,27 @@
 
   .petBarFill.gauge{ background:linear-gradient(90deg,#2e9eff,#8bffe0); }
 
-  #petMilkCount{ margin-top:6px; font-size:13px; font-weight:700; color:#bfe0ff; }
+  /* когда показатель критически низкий — пульсирует иконка рядом с полоской,
+     чтобы это было заметно даже краем глаза (как иконка здоровья в играх) */
+  .petBarLabel.critical{ animation: labelPulse .8s ease-in-out infinite; }
+  @keyframes labelPulse{
+    0%,100%{ transform:scale(1); filter:drop-shadow(0 0 0 rgba(255,70,70,0)); }
+    50%{ transform:scale(1.4); filter:drop-shadow(0 0 6px rgba(255,70,70,.9)); }
+  }
+
+  /* всплывающая цифра прироста ("+N") над полоской при кормлении/ласке/дойке */
+  .gainPopup{
+    position:absolute; right:0; top:-2px; font-weight:800; font-size:12px; color:#8bffb0;
+    pointer-events:none; text-shadow:0 1px 3px rgba(0,0,0,.7);
+    animation: gainFloat 1.1s ease-out forwards;
+  }
+  @keyframes gainFloat{
+    0%{ opacity:0; transform:translateY(0) scale(.8); }
+    15%{ opacity:1; transform:translateY(-4px) scale(1.15); }
+    100%{ opacity:0; transform:translateY(-22px) scale(1); }
+  }
+
+  #petMilkCount{ position:relative; margin-top:6px; font-size:13px; font-weight:700; color:#bfe0ff; }
 
   /* subtle idle "breathing" so she doesn't look frozen */
   #petSpriteWrap{ animation: petBreathe 3.2s ease-in-out infinite; }
@@ -243,8 +285,8 @@
       <div id="petSpriteFallback">🐐</div>
     </div>
     <div id="petName">Сонечка</div>
-    <div class="petBarRow"><span class="petBarLabel">💛</span><div class="petBarTrack"><div id="petHappyBar" class="petBarFill happy"></div></div></div>
-    <div class="petBarRow"><span class="petBarLabel">🍽</span><div class="petBarTrack"><div id="petFullBar" class="petBarFill full"></div></div></div>
+    <div class="petBarRow"><span id="happyLabel" class="petBarLabel">💛</span><div class="petBarTrack"><div id="petHappyBar" class="petBarFill happy"></div></div></div>
+    <div class="petBarRow"><span id="fullLabel" class="petBarLabel">🍽</span><div class="petBarTrack"><div id="petFullBar" class="petBarFill full"></div></div></div>
     <div class="petBarRow"><span class="petBarLabel">🧪</span><div class="petBarTrack"><div id="petGaugeBar" class="petBarFill gauge"></div></div></div>
     <div id="petMilkCount">🥛 0 / 10</div>
   </div>
@@ -545,6 +587,8 @@
   const petHappyBar = document.getElementById("petHappyBar");
   const petFullBar = document.getElementById("petFullBar");
   const petGaugeBar = document.getElementById("petGaugeBar");
+  const happyLabel = document.getElementById("happyLabel");
+  const fullLabel = document.getElementById("fullLabel");
   const petMilkCount = document.getElementById("petMilkCount");
   const petBubble = document.getElementById("petBubble");
   const hintBubble = document.getElementById("hintBubble");
@@ -931,12 +975,28 @@
     petSpriteImg.src = `images/sonechka-${w}-${m}.png`;
   }
 
+  const CRITICAL_STAT_THRESHOLD = 25; // ниже этого иконка рядом с полоской начинает пульсировать
   function updatePetUI(){
     updateSprite();
-    petHappyBar.style.width = Math.max(0,Math.min(100,cfg.happiness)) + "%";
-    petFullBar.style.width = Math.max(0,Math.min(100,cfg.fullness)) + "%";
+    const happyPct = Math.max(0,Math.min(100,cfg.happiness));
+    const fullPct = Math.max(0,Math.min(100,cfg.fullness));
+    petHappyBar.style.width = happyPct + "%";
+    petFullBar.style.width = fullPct + "%";
     petGaugeBar.style.width = Math.max(0,Math.min(100,cfg.milkGauge||0)) + "%";
     petMilkCount.textContent = `🥛 ${Math.floor(cfg.milkCans)} / ${cfg.floodThreshold}`;
+    happyLabel.classList.toggle("critical", happyPct < CRITICAL_STAT_THRESHOLD);
+    fullLabel.classList.toggle("critical", fullPct < CRITICAL_STAT_THRESHOLD);
+  }
+
+  // всплывающая "+N" над нужной полоской — быстрая игровая обратная связь на донат
+  function popupNear(barEl, text){
+    const row = barEl.closest(".petBarRow");
+    if(!row) return;
+    const el = document.createElement("div");
+    el.className = "gainPopup";
+    el.textContent = text;
+    row.appendChild(el);
+    setTimeout(() => el.remove(), 1200);
   }
 
   function pickPhrase(list, fallback){
@@ -1032,12 +1092,15 @@
   function handlePetDonation(amount, rawMessage, donorName){
     if(amount < Number(cfg.donationMinAmount||50)) return; // слишком мало — Сонечка не реагирует
     const text = String(rawMessage||"").toLowerCase();
-    const action = (cfg.actions||[]).find(a =>
+    // если в сообщении упомянуто сразу несколько действий (например "покормить и подоить"),
+    // донат делится между ними поровну — каждое действие считает свою силу от своей доли
+    const matched = (cfg.actions||[]).filter(a =>
       a.enabled !== false &&
       parseKeywords(a.keywords).some(kw => kw && text.includes(kw))
     );
-    if(!action) return;
-    applyPetAction(action, amount, donorName || "Донатер");
+    if(!matched.length) return;
+    const share = amount / matched.length;
+    matched.forEach(action => applyPetAction(action, share, donorName || "Донатер"));
   }
 
   // чем ближе донат к максимальной сумме — тем сильнее эффект (0..1)
@@ -1065,6 +1128,7 @@
       cfg.fullness = Math.min(100, cfg.fullness + gain);
       cfg.growth = cfg.growth + Number(cfg.feedGrowthStep||0.2)*strength;
       applyOverflowSlowdown(overflow, "fullnessSlowUntil");
+      popupNear(petFullBar, "+" + Math.round(gain));
       showBubble(`${donorName}: ${pickPhrase(cfg.feedPhrases, "Ой как вкусно!")} 🌾`);
       playFile("sounds/feed.mp3");
     } else if(action.effect === "pet"){
@@ -1072,6 +1136,7 @@
       const overflow = Math.max(0, cfg.happiness + gain - 100);
       cfg.happiness = Math.min(100, cfg.happiness + gain);
       applyOverflowSlowdown(overflow, "happinessSlowUntil");
+      popupNear(petHappyBar, "+" + Math.round(gain));
       showBubble(`${donorName}: ${pickPhrase(cfg.petPhrases, "Хи-хи-хи!")} 💛`);
       playFile("sounds/pet.mp3");
     } else if(action.effect === "milk"){
@@ -1081,6 +1146,7 @@
       cfg.milkGauge = (cfg.milkGauge||0) + gaugeFill;
       cfg.happiness = Math.max(0, cfg.happiness - Number(cfg.milkHappinessCost||0)*strength);
       cfg.fullness = Math.max(0, cfg.fullness - Number(cfg.milkFullnessCost||0)*strength);
+      popupNear(petGaugeBar, "+" + Math.round(gaugeFill));
       postStat("donor", donorName, amount);
       playFile("sounds/milk.mp3");
       let gainedCans = 0;
@@ -1113,41 +1179,62 @@
     }, (cfg.floodWarningSeconds||10)*1000);
   }
 
-  function spawnMilkDrops(){
-    dropLayer.innerHTML = "";
-    const count = 40;
-    for(let i=0;i<count;i++){
+  function spawnMilkDrops(count){
+    for(let i=0;i<(count||40);i++){
       const d = document.createElement("div");
       d.className = "milkDrop";
       d.style.left = Math.random()*100 + "%";
       d.style.animationDuration = (0.9 + Math.random()*0.8) + "s";
-      d.style.animationDelay = (Math.random()*0.6) + "s";
+      d.style.animationDelay = (Math.random()*0.3) + "s";
       dropLayer.appendChild(d);
     }
   }
 
   // проигрывает всплеск несколько раз подряд (вразнобой), будто реально брызгает
-  function playSplashBurst(){
-    const hits = 6 + Math.floor(Math.random()*4);
-    for(let i=0;i<hits;i++){
-      setTimeout(() => playFile("sounds/flood.mp3"), i * (140 + Math.random()*120));
+  // отдельные "плюхи" разбросаны по всей длительности заливки (а не один
+  // раз в начале), плюс непрерывный фоновый плеск-петля на то же время
+  let splashLoopAudio = null;
+  function playSplashBurst(holdMs){
+    let t = 0;
+    while(t < Math.max(0, holdMs - 400)){
+      setTimeout(() => playFile("sounds/flood.mp3"), t);
+      t += 450 + Math.random()*500;
     }
-    playFile("sounds/bryzg-bg.mp3");
+    if(!cfg.muteSound){
+      try{
+        splashLoopAudio = new Audio("sounds/bryzg-bg.mp3");
+        splashLoopAudio.loop = true;
+        splashLoopAudio.volume = Math.max(0, Math.min(1, (cfg.soundVolume||0)/100));
+        splashLoopAudio.play().catch(()=>{});
+      }catch(e){}
+    }
+  }
+  function stopSplashLoop(){
+    if(splashLoopAudio){
+      try{ splashLoopAudio.pause(); }catch(e){}
+      splashLoopAudio = null;
+    }
   }
 
   function triggerFlood(){
     cfg.milkCans = 0;
     cfg.floodThreshold = cfg.floodThreshold + Number(cfg.floodThresholdIncrement||1); // 10 -> 11 -> 12 ...
     saveConfig();
+    const holdMs = (cfg.floodHoldSeconds||6)*1000;
     floodText.textContent = cfg.floodText;
     floodOverlay.classList.add("show");
-    spawnMilkDrops();
-    playSplashBurst();
+    dropLayer.innerHTML = "";
+    spawnMilkDrops(40);
+    const dropWave = setInterval(() => spawnMilkDrops(15), 900); // капли продолжают падать всё время заливки
+    playSplashBurst(holdMs);
     try{ floodVideo.currentTime = 0; floodVideo.play().catch(()=>{}); }catch(e){}
     setTimeout(() => {
+      clearInterval(dropWave);
+      stopSplashLoop();
       floodOverlay.classList.remove("show");
+      dropLayer.innerHTML = "";
       try{ floodVideo.pause(); }catch(e){}
-    }, (cfg.floodHoldSeconds||6)*1000);
+    }, holdMs);
     updatePetUI();
     // бидон = N литров молочка; раунд ловли ведёт бот в чате (засчитывает
     // "!ловлю" каждому, кто напишет, пока литры не кончатся) — виджет только
