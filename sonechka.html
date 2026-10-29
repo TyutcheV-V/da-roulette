@@ -426,6 +426,27 @@
       <button id="testPopupBtn">Показать каприз сейчас</button>
     </div>
 
+    <h3>Нытьё в чат Twitch</h3>
+    <div class="muted">Когда наверху выскакивает каприз (голодная/грустная/просит подоить) и донатов давно не было — бот Сонечки пишет про это прямо в чат, с подсказкой что задонатить. Нужен настроенный и запущенный бот (bot/README.md) и прокси-URL выше.</div>
+    <label><input type="checkbox" id="cfgChatNagEnabled" checked> Писать в чат</label>
+    <label>Молчать, пока не пройдёт без донатов, минут</label>
+    <input type="number" id="cfgChatNagIdleMinutes" value="20" min="1">
+    <label>Фразы в чат, когда голодная (ссылку на донат добавит сама)</label>
+    <textarea id="cfgChatHungryPhrases">АЛЁ Я ГОЛОДНАЯ((((
+ЛЮДИ, Я ГОЛОДНАЯ, ПОМОГИТЕ
+ЖИВОТ СВОДИТ ОТ ГОЛОДА(</textarea>
+    <label>Фразы в чат, когда грустная</label>
+    <textarea id="cfgChatSadPhrases">МНЕ ТАК ГРУСТНО(((
+ПОГЛАДЬТЕ МЕНЯ, Я ОДИНОКАЯ
+НИКТО МЕНЯ НЕ ЛЮБИТ(((</textarea>
+    <label>Фразы в чат, когда просит подоить</label>
+    <textarea id="cfgChatMilkPhrases">МОЛОКО РАСПИРАЕТ, ПОМОГИТЕ
+ДАВНО МЕНЯ НЕ ДОИЛИ(((
+ПОДОИТЕ МЕНЯ СРОЧНО</textarea>
+    <div class="row" style="margin-top:6px;">
+      <button id="testChatNagBtn">Отправить нытьё в чат сейчас</button>
+    </div>
+
     <h3>Подсказка над головой</h3>
     <div class="muted">Крутится над карточкой с советами, что писать в донат. Молчит, пока недавно были донаты — появляется только когда долго было тихо.</div>
     <div class="row">
@@ -520,6 +541,11 @@
       hungryPopupPhrases: "Я ГОЛОДНАЯ\nПОКОРМИ МЕНЯ\nЖИВОТ УРЧИТ",
       sadPopupPhrases: "МНЕ ГРУСТНО\nПОГЛАДЬ МЕНЯ\nОБНИМИ МЕНЯ",
       milkReadyPopupPhrases: "ПОДОИ МЕНЯ Я УЖЕ НЕ МОГУ\nМОЛОКО РАСПИРАЕТ\nСКОРЕЕ ПОДОИ МЕНЯ",
+      chatNagEnabled: true,          // писать капризы прямо в чат Twitch через бота, не только на экран
+      chatNagIdleMinutes: 20,        // молчать в чат, пока не пройдёт столько минут без донатов
+      chatHungryPhrases: "АЛЁ Я ГОЛОДНАЯ((((\nЛЮДИ, Я ГОЛОДНАЯ, ПОМОГИТЕ\nЖИВОТ СВОДИТ ОТ ГОЛОДА(",
+      chatSadPhrases: "МНЕ ТАК ГРУСТНО(((\nПОГЛАДЬТЕ МЕНЯ, Я ОДИНОКАЯ\nНИКТО МЕНЯ НЕ ЛЮБИТ(((",
+      chatMilkPhrases: "МОЛОКО РАСПИРАЕТ, ПОМОГИТЕ\nДАВНО МЕНЯ НЕ ДОИЛИ(((\nПОДОИТЕ МЕНЯ СРОЧНО",
       hintIdleMinutes: 3,            // не показывать подсказку, пока не пройдёт столько минут без донатов
       hintRotationSeconds: 45,
       // runtime pet state, persisted alongside settings
@@ -649,6 +675,12 @@
   const cfgPopupHungryPhrases = document.getElementById("cfgPopupHungryPhrases");
   const cfgPopupSadPhrases = document.getElementById("cfgPopupSadPhrases");
   const cfgPopupMilkPhrases = document.getElementById("cfgPopupMilkPhrases");
+  const cfgChatNagEnabled = document.getElementById("cfgChatNagEnabled");
+  const cfgChatNagIdleMinutes = document.getElementById("cfgChatNagIdleMinutes");
+  const cfgChatHungryPhrases = document.getElementById("cfgChatHungryPhrases");
+  const cfgChatSadPhrases = document.getElementById("cfgChatSadPhrases");
+  const cfgChatMilkPhrases = document.getElementById("cfgChatMilkPhrases");
+  const testChatNagBtn = document.getElementById("testChatNagBtn");
   const cfgHintIdleMinutes = document.getElementById("cfgHintIdleMinutes");
   const cfgHintSeconds = document.getElementById("cfgHintSeconds");
   const testPopupBtn = document.getElementById("testPopupBtn");
@@ -737,6 +769,11 @@
     cfgPopupHungryPhrases.value = cfg.hungryPopupPhrases;
     cfgPopupSadPhrases.value = cfg.sadPopupPhrases;
     cfgPopupMilkPhrases.value = cfg.milkReadyPopupPhrases;
+    cfgChatNagEnabled.checked = cfg.chatNagEnabled !== false;
+    cfgChatNagIdleMinutes.value = cfg.chatNagIdleMinutes;
+    cfgChatHungryPhrases.value = cfg.chatHungryPhrases;
+    cfgChatSadPhrases.value = cfg.chatSadPhrases;
+    cfgChatMilkPhrases.value = cfg.chatMilkPhrases;
     cfgHintIdleMinutes.value = cfg.hintIdleMinutes;
     cfgHintSeconds.value = cfg.hintRotationSeconds;
     renderAuthStatus();
@@ -888,6 +925,12 @@
   cfgPopupHungryPhrases.addEventListener("change", () => { cfg.hungryPopupPhrases = cfgPopupHungryPhrases.value; saveConfig(); });
   cfgPopupSadPhrases.addEventListener("change", () => { cfg.sadPopupPhrases = cfgPopupSadPhrases.value; saveConfig(); });
   cfgPopupMilkPhrases.addEventListener("change", () => { cfg.milkReadyPopupPhrases = cfgPopupMilkPhrases.value; saveConfig(); });
+  cfgChatNagEnabled.addEventListener("change", () => { cfg.chatNagEnabled = cfgChatNagEnabled.checked; saveConfig(); });
+  cfgChatNagIdleMinutes.addEventListener("change", () => { cfg.chatNagIdleMinutes = Number(cfgChatNagIdleMinutes.value)||20; saveConfig(); });
+  cfgChatHungryPhrases.addEventListener("change", () => { cfg.chatHungryPhrases = cfgChatHungryPhrases.value; saveConfig(); });
+  cfgChatSadPhrases.addEventListener("change", () => { cfg.chatSadPhrases = cfgChatSadPhrases.value; saveConfig(); });
+  cfgChatMilkPhrases.addEventListener("change", () => { cfg.chatMilkPhrases = cfgChatMilkPhrases.value; saveConfig(); });
+  testChatNagBtn.addEventListener("click", () => { requestChatNag(buildChatNagText(pickMoodCategory() || "hungry")); });
   cfgHintIdleMinutes.addEventListener("change", () => { cfg.hintIdleMinutes = Number(cfgHintIdleMinutes.value)||0; saveConfig(); });
   cfgHintSeconds.addEventListener("change", () => { cfg.hintRotationSeconds = Number(cfgHintSeconds.value)||45; saveConfig(); });
   testPopupBtn.addEventListener("click", () => showMoodPopup());
@@ -1033,6 +1076,21 @@
   }
   function catchEndpoint(){
     return da.proxyUrl ? `${da.proxyUrl}/api/catch` : null;
+  }
+  function nagEndpoint(){
+    return da.proxyUrl ? `${da.proxyUrl}/api/nag` : null;
+  }
+  // просит бота Сонечки написать реплику в чат Twitch (сервер сам ограничивает
+  // частоту — см. api/nag.js — так что лишние вызовы отсюда не страшны)
+  async function requestChatNag(text){
+    const url = nagEndpoint();
+    if(!url || !text) return;
+    try{
+      await fetch(url, {
+        method:"POST", headers:{ "Content-Type":"application/json" },
+        body: JSON.stringify({ text })
+      });
+    }catch(e){ console.warn("nag request failed", e); }
   }
   // открывает раунд ловли на сервере — бот в чате сам решает, кому и сколько
   // литров засчитать по команде "!ловлю"; виджет только показывает результат
@@ -1326,9 +1384,37 @@
     const delayMin = lo + Math.random()*(hi-lo);
     popupTimer = setTimeout(() => {
       const cat = pickMoodCategory();
-      if(cat) showMoodPopup(cat); // ей реально что-то нужно — иначе этот цикл просто пропускаем
+      if(cat){
+        showMoodPopup(cat); // ей реально что-то нужно — иначе этот цикл просто пропускаем
+        maybeNagChat(cat);
+      }
       scheduleNextPopup();
     }, delayMin*60*1000);
+  }
+
+  // ---------- то же самое, но в чат Twitch через бота (не только на экран) ----------
+  // первое совпадающее включённое действие нужного эффекта — для подсказки
+  // "задонать с таким-то словом" в реплике в чат
+  function actionKeywordFor(effect){
+    const action = (cfg.actions||[]).find(a => a.enabled !== false && a.effect === effect);
+    return action ? (parseKeywords(action.keywords)[0] || null) : null;
+  }
+  function buildChatNagText(category){
+    const phrasesField = category === "hungry" ? cfg.chatHungryPhrases : category === "sad" ? cfg.chatSadPhrases : cfg.chatMilkPhrases;
+    const fallback = category === "hungry" ? "АЛЁ Я ГОЛОДНАЯ((((" : category === "sad" ? "МНЕ ТАК ГРУСТНО(((" : "ПОДОИТЕ МЕНЯ СРОЧНО(((";
+    const base = pickPhrase(phrasesField, fallback);
+    const effect = category === "hungry" ? "feed" : category === "sad" ? "pet" : "milk";
+    const keyword = actionKeywordFor(effect);
+    const amount = Math.round(Number(cfg.donationMinAmount||50));
+    const cta = keyword ? ` Донат от ${amount}₽ со словом «${keyword}» 🙏` : "";
+    return base + cta;
+  }
+  function maybeNagChat(category){
+    if(cfg.chatNagEnabled === false) return;
+    const idleMs = Date.now() - (cfg.lastInteractionAt||0);
+    const idleNeeded = Math.max(1, Number(cfg.chatNagIdleMinutes||20))*60000;
+    if(idleMs < idleNeeded) return; // донатили не так давно — в чат пока молчим
+    requestChatNag(buildChatNagText(category));
   }
 
   // ---------- idle hint bubble — cycles tips for each action + the catch command ----------

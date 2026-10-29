@@ -89,6 +89,36 @@ client.connect().catch((e) => {
   process.exit(1);
 });
 
+// Текстовые команды прямо в этом же окне консоли — набрал и Enter, без
+// закрытия самого процесса (и без второго окна/веб-панели).
+const readline = require("readline");
+readline.createInterface({ input: process.stdin }).on("line", (line) => {
+  const cmd = line.trim().toLowerCase();
+  if (cmd === "stop" || cmd === "выкл") {
+    client.disconnect().then(() => console.log("отключено от чата (наберите start, чтобы вернуть)"));
+  } else if (cmd === "start" || cmd === "вкл") {
+    client.connect().catch((e) => console.error("не удалось подключиться", e));
+  } else if (cmd) {
+    console.log("команды: stop — отключить бота от чата, start — подключить обратно");
+  }
+});
+console.log("готово. команды: stop — отключить, start — подключить обратно");
+
+// Капризы в чат ("АЛЁ Я ГОЛОДНАЯ((((" и т.п.): виджет сам решает когда и что
+// сказать и кладёт готовый текст на /api/nag, бот просто периодически
+// проверяет и озвучивает. Тот же Vercel-проект, что и у catch/stats.
+const NAG_API_URL = CATCH_API_URL.replace(/\/api\/catch$/, "/api/nag");
+async function checkNag() {
+  try {
+    const res = await fetch(`${NAG_API_URL}?action=pending`);
+    const json = await res.json();
+    if (json.text) await client.say(`#${CHANNEL}`, json.text);
+  } catch (e) {
+    console.error("nag check failed", e);
+  }
+}
+setInterval(checkNag, 20 * 1000);
+
 // Render's free Web Service tier requires binding to a port and answering
 // HTTP, and spins the service down after inactivity unless something pings
 // it — this endpoint is what an external uptime pinger (e.g. UptimeRobot)
