@@ -66,6 +66,7 @@ client.on("message", async (channel, tags, message, self) => {
   if (text === CATCH_COMMAND) {
     try {
       const result = await reportCatch(login);
+      console.log("catch result:", JSON.stringify(result)); // временно, для диагностики
       // намеренно молчим в чате на каждую дойку — иначе чат зафлудит при
       // дойке в 10 литров за несколько секунд; результат виден на экране
       if (!result.ok) console.warn("catch api error", result);
