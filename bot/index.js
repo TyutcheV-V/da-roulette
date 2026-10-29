@@ -12,6 +12,8 @@ const CATCH_API_URL = requireEnv("CATCH_API_URL"); // e.g. https://da-roulette.v
 const CATCH_SECRET = requireEnv("CATCH_SECRET"); // must match the Vercel project's CATCH_SECRET
 const CATCH_COMMAND = (process.env.CATCH_COMMAND || "!ловлю").trim().toLowerCase();
 const BALANCE_COMMAND = (process.env.BALANCE_COMMAND || "!молочко").trim().toLowerCase();
+const REQUEST_COMMAND = (process.env.REQUEST_COMMAND || "!просьба").trim().toLowerCase();
+const REQUEST_COST = Math.max(1, Math.round(Number(process.env.REQUEST_COST) || 1));
 
 function requireEnv(name) {
   const v = process.env[name];
@@ -36,6 +38,15 @@ async function getBalance(user) {
   return res.json();
 }
 
+async function spendOnRequest(user, text, cost) {
+  const res = await fetch(CATCH_API_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "X-Bot-Secret": CATCH_SECRET },
+    body: JSON.stringify({ action: "request", user, text, cost }),
+  });
+  return res.json();
+}
+
 function formatLiters(n) {
   const num = Number(n) || 0;
   return Number.isInteger(num) ? String(num) : num.toFixed(1);
@@ -56,9 +67,30 @@ client.on("disconnected", (reason) => {
 
 client.on("message", async (channel, tags, message, self) => {
   if (self) return;
-  const text = message.trim().toLowerCase();
+  const original = message.trim();
+  const text = original.toLowerCase();
   const login = (tags.username || "").toLowerCase();
   if (!login) return;
+
+  if (text === REQUEST_COMMAND || text.startsWith(REQUEST_COMMAND + " ")) {
+    const requestText = original.slice(REQUEST_COMMAND.length).trim();
+    const displayName = tags["display-name"] || tags.username;
+    if (!requestText) {
+      await client.say(channel, `@${displayName}, напиши просьбу после команды: ${REQUEST_COMMAND} <что сделать>`);
+      return;
+    }
+    try {
+      const result = await spendOnRequest(login, requestText, REQUEST_COST);
+      if (result.spent) {
+        await client.say(channel, `@${displayName}, принято! (осталось ${formatLiters(result.balance)} л) 📣`);
+      } else {
+        await client.say(channel, `@${displayName}, не хватает молочка — нужно ${REQUEST_COST} л, у тебя ${formatLiters(result.balance)} 🥛`);
+      }
+    } catch (e) {
+      console.error("request spend failed", e);
+    }
+    return;
+  }
 
   if (text === CATCH_COMMAND) {
     try {

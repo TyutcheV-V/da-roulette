@@ -181,6 +181,16 @@
   }
   #catchWinnersBanner.show{ opacity:1; transform:translateX(-50%) translateY(0); }
 
+  /* viewer request bought with milk balance ("!просьба ...") */
+  #requestBanner{
+    position:absolute; left:50%; top:30%; transform:translateX(-50%) translateY(10px);
+    background:rgba(40,10,35,.92); border:2px solid #ff9ad6; border-radius:16px;
+    padding:16px 26px; font-size:22px; font-weight:800; text-align:center; max-width:80%;
+    opacity:0; pointer-events:none; transition:opacity .3s ease, transform .3s ease;
+    box-shadow:0 0 30px rgba(255,154,214,.5);
+  }
+  #requestBanner.show{ opacity:1; transform:translateX(-50%) translateY(0); }
+
   /* random fullscreen mood popup ("Я ГОЛОДНАЯ" etc.) */
   #moodPopup{
     position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center;
@@ -264,6 +274,7 @@
   <div id="catchBanner">🥛 Лови команду <span id="catchCmdLabel">!ловлю</span>!</div>
   <div id="burstWarning">СОНЕЧКА СЕЙЧАС ЗАПУСТИТ МОЛОКО</div>
   <div id="catchWinnersBanner"></div>
+  <div id="requestBanner"></div>
   <div id="moodPopup">
     <img id="moodPopupImg" alt="Сонечка">
     <div id="moodPopupFallback">😠🐐</div>
@@ -310,6 +321,18 @@
     <input type="text" id="cfgCatchCommand" value="!ловлю">
     <label>Сколько секунд ловим (окно команды)</label>
     <input type="number" id="cfgCatchWindow" value="10" min="3" max="60">
+
+    <h3>Просьбы за молочко (ведёт бот в чате)</h3>
+    <div class="muted">Тоже слушает бот, не этот виджет — значения ниже только для подсказки зрителям и должны совпадать с настройками бота (env `REQUEST_COMMAND`/`REQUEST_COST`). Зритель пишет команду и текст просьбы, бот списывает литры с его баланса и просьба всплывает баннером на экране.</div>
+    <div class="row">
+      <div><label>Команда</label><input type="text" id="cfgRequestCommand" value="!просьба"></div>
+      <div><label>Цена, литров</label><input type="number" id="cfgRequestCost" value="1" min="1"></div>
+    </div>
+    <label>Сколько секунд держится баннер с просьбой на экране</label>
+    <input type="number" id="cfgRequestHoldSeconds" value="10" min="3" max="60">
+    <div class="row" style="margin-top:6px;">
+      <button id="testRequestBtn">Показать тестовую просьбу</button>
+    </div>
 
     <h3>Расположение</h3>
     <div class="muted">Источник в OBS должен быть на весь холст (например 1920×1080) — иначе заливка молоком не займёт весь экран, а Сонечка всё равно встанет в нужное место за счёт отступов.</div>
@@ -514,6 +537,9 @@
       actionDelaySeconds: 10,    // пауза перед действием, чтобы не наложилось на звук доната
       catchCommand: "!ловлю",
       catchWindowSeconds: 10,
+      requestCommand: "!просьба", // инфо-подсказка — реально слушает бот, см. env REQUEST_COMMAND
+      requestCost: 1,
+      requestHoldSeconds: 10,
       muteSound: false,
       soundVolume: 80,
       actions: DEFAULT_ACTIONS.map(a => Object.assign({}, a)),
@@ -621,6 +647,7 @@
   const dropLayer = document.getElementById("dropLayer");
   const burstWarning = document.getElementById("burstWarning");
   const catchWinnersBanner = document.getElementById("catchWinnersBanner");
+  const requestBanner = document.getElementById("requestBanner");
   const moodPopup = document.getElementById("moodPopup");
   const moodPopupImg = document.getElementById("moodPopupImg");
   const moodPopupFallback = document.getElementById("moodPopupFallback");
@@ -640,6 +667,10 @@
   const cfgLitersPerFlood = document.getElementById("cfgLitersPerFlood");
   const cfgCatchCommand = document.getElementById("cfgCatchCommand");
   const cfgCatchWindow = document.getElementById("cfgCatchWindow");
+  const cfgRequestCommand = document.getElementById("cfgRequestCommand");
+  const cfgRequestCost = document.getElementById("cfgRequestCost");
+  const cfgRequestHoldSeconds = document.getElementById("cfgRequestHoldSeconds");
+  const testRequestBtn = document.getElementById("testRequestBtn");
   const arrangeModeBtn = document.getElementById("arrangeModeBtn");
   const arrangeHint = document.getElementById("arrangeHint");
   const cfgPosX = document.getElementById("cfgPosX");
@@ -741,6 +772,9 @@
     cfgLitersPerFlood.value = cfg.litersPerFlood;
     cfgCatchCommand.value = cfg.catchCommand;
     cfgCatchWindow.value = cfg.catchWindowSeconds;
+    cfgRequestCommand.value = cfg.requestCommand;
+    cfgRequestCost.value = cfg.requestCost;
+    cfgRequestHoldSeconds.value = cfg.requestHoldSeconds;
     cfgDonationMin.value = cfg.donationMinAmount;
     cfgDonationMax.value = cfg.donationMaxAmount;
     cfgActionDelay.value = cfg.actionDelaySeconds;
@@ -849,6 +883,10 @@
   cfgLitersPerFlood.addEventListener("change", () => { cfg.litersPerFlood = Math.max(1, Number(cfgLitersPerFlood.value)||10); saveConfig(); });
   cfgCatchCommand.addEventListener("change", () => { cfg.catchCommand = cfgCatchCommand.value.trim() || "!ловлю"; saveConfig(); });
   cfgCatchWindow.addEventListener("change", () => { cfg.catchWindowSeconds = Number(cfgCatchWindow.value)||10; saveConfig(); });
+  cfgRequestCommand.addEventListener("change", () => { cfg.requestCommand = cfgRequestCommand.value.trim() || "!просьба"; saveConfig(); });
+  cfgRequestCost.addEventListener("change", () => { cfg.requestCost = Math.max(1, Number(cfgRequestCost.value)||1); saveConfig(); });
+  cfgRequestHoldSeconds.addEventListener("change", () => { cfg.requestHoldSeconds = Number(cfgRequestHoldSeconds.value)||10; saveConfig(); });
+  testRequestBtn.addEventListener("click", () => { showRequestBanner({ user: "Тестер", text: "покажи сердечко" }); });
   cfgDonationMin.addEventListener("change", () => { cfg.donationMinAmount = Number(cfgDonationMin.value)||50; saveConfig(); });
   cfgDonationMax.addEventListener("change", () => { cfg.donationMaxAmount = Number(cfgDonationMax.value)||1000; saveConfig(); });
   cfgActionDelay.addEventListener("change", () => { cfg.actionDelaySeconds = Math.max(0, Number(cfgActionDelay.value)||0); saveConfig(); });
@@ -1077,6 +1115,28 @@
     bubbleTimer = setTimeout(() => petBubble.classList.remove("show"), 4500);
   }
 
+  // ---------- просьбы за молочко ("!просьба <текст>", бот списывает литры и кладёт в очередь) ----------
+  let requestQueue = [];
+  let requestBannerBusy = false;
+  function showNextRequest(){
+    if(requestBannerBusy) return;
+    const req = requestQueue.shift();
+    if(!req) return;
+    requestBannerBusy = true;
+    requestBanner.textContent = `📣 ${req.user} просит: ${req.text}`;
+    requestBanner.classList.add("show");
+    playFile("sounds/bleat.mp3");
+    setTimeout(() => {
+      requestBanner.classList.remove("show");
+      requestBannerBusy = false;
+      setTimeout(showNextRequest, 400); // маленькая пауза между просьбами подряд
+    }, Math.max(3, Number(cfg.requestHoldSeconds||10))*1000);
+  }
+  function showRequestBanner(req){
+    requestQueue.push(req);
+    showNextRequest();
+  }
+
   // ---------- stats (Upstash Redis via the proxy's /api/stats, no-ops gracefully if not set up yet) ----------
   function statsEndpoint(){
     return da.proxyUrl ? `${da.proxyUrl}/api/stats` : null;
@@ -1120,6 +1180,18 @@
       if(!r.ok) return null;
       return await r.json();
     }catch(e){ console.warn("catch status failed", e); return null; }
+  }
+  // просьбы, оплаченные литрами молочка через бота ("!просьба ...") — бот
+  // списывает и кладёт в очередь на сервере, виджет просто периодически её вычерпывает
+  async function fetchPendingRequests(){
+    const url = catchEndpoint();
+    if(!url) return;
+    try{
+      const r = await fetch(`${url}?action=requests`);
+      if(!r.ok) return;
+      const json = await r.json();
+      (json.requests||[]).forEach(showRequestBanner);
+    }catch(e){ console.warn("requests fetch failed", e); }
   }
   async function postStat(type, name, amount){
     const url = statsEndpoint();
@@ -1441,6 +1513,7 @@
       return `Хотите ${verb} меня? Напишите донат от ${Math.round(cfg.donationMinAmount||100)}₽ со словом «${kw}»`;
     }).filter(Boolean);
     hints.push(`В момент заливки ловите молоко командой ${cfg.catchCommand} в чате!`);
+    hints.push(`Накопили молочко? Закажите просьбу: ${cfg.requestCommand} <текст> (-${Math.round(cfg.requestCost||1)} л)`);
     return hints;
   }
   let hintIdx = 0;
@@ -1541,6 +1614,8 @@
   if(!isDockSettings){
     scheduleNextPopup();
     setInterval(rotateHint, Math.max(5000, (cfg.hintRotationSeconds||45)*1000));
+    fetchPendingRequests();
+    setInterval(fetchPendingRequests, 15*1000);
   }
 })();
 </script>
