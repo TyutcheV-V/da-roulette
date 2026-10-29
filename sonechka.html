@@ -20,6 +20,7 @@
   #stage{ position:relative; width:100%; height:100%; }
   body.dockMode{ background:#101018; }
   body.dockMode #stage > *:not(#settingsPanel){ display:none !important; }
+  body.dockMode{ overflow-y:auto !important; overflow-x:hidden; }
   body.dockMode #settingsPanel{
     position:static; display:block; width:100%; max-width:none; height:auto;
     min-height:100vh; max-height:none; border-radius:0; box-shadow:none; box-sizing:border-box;
