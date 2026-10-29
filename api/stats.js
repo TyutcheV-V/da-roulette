@@ -1,6 +1,6 @@
 // Leaderboard storage for Sonechka — who donated most towards milk, and which
-// Twitch chatters caught (drank) the most. Backed by Upstash Redis (connect it
-// to this Vercel project from the Marketplace tab — see the README).
+// Twitch chatters caught (drank) the most. Backed by Upstash Redis, connected
+// to this Vercel project via the Marketplace integration.
 const KV_URL = process.env.UPSTASH_REDIS_REST_URL || process.env.KV_REST_API_URL;
 const KV_TOKEN = process.env.UPSTASH_REDIS_REST_TOKEN || process.env.KV_REST_API_TOKEN;
 
