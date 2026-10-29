@@ -59,7 +59,29 @@
     50%{ box-shadow:0 8px 26px rgba(0,0,0,.55), 0 0 22px rgba(124,77,255,.65); }
   }
 
+  /* блик: по умолчанию невидим (opacity:0, анимация не крутится вообще) и
+     включается JS'ом на один короткий проход через класс .shine, который
+     сам себя снимает по таймеру. Если страница теряет видимость (OBS
+     переключил сцену, вкладка свёрнута и т.п.), JS мгновенно снимает класс
+     и блик гаснет сразу — а не замирает где-то на полпути, как было бы
+     с чистой бесконечной CSS-анимацией */
+  #petCard::before{
+    content:""; position:absolute; inset:0; border-radius:14px; pointer-events:none;
+    opacity:0;
+    background:linear-gradient(115deg, transparent 0%, transparent 42%, rgba(255,255,255,.35) 50%, transparent 58%, transparent 100%);
+    background-size:300% 100%; background-position:200% 0;
+  }
+  #petCard.shine::before{
+    opacity:1;
+    animation: petShine 1.3s ease-in-out 1;
+  }
+  @keyframes petShine{
+    0%{ background-position:200% 0; }
+    100%{ background-position:-40% 0; }
+  }
+
   #petSpriteWrap{
+    position:relative; /* поверх блика карточки (petShine), не под ним */
     width:120px; height:120px; margin:0 auto 6px; border-radius:50%;
     background:var(--card-navy-light); display:flex; align-items:center; justify-content:center;
     overflow:hidden; border:2px solid var(--card-border);
@@ -67,7 +89,7 @@
   #petSpriteImg{ width:100%; height:100%; object-fit:cover; display:none; }
   #petSpriteFallback{ font-size:56px; line-height:1; }
 
-  #petName{ font-weight:800; font-size:14px; letter-spacing:.03em; margin-bottom:6px; text-transform:uppercase; }
+  #petName{ position:relative; font-weight:800; font-size:14px; letter-spacing:.03em; margin-bottom:6px; text-transform:uppercase; }
 
   /* position:relative тут ради .gainPopup (всплывающая "+N") — он якорится на эту строку */
   .petBarRow{ position:relative; display:flex; align-items:center; gap:6px; margin-bottom:4px; }
@@ -99,7 +121,7 @@
     100%{ opacity:0; transform:translateY(-22px) scale(1); }
   }
 
-  #petMilkCount{ margin-top:6px; font-size:13px; font-weight:700; color:#bfe0ff; }
+  #petMilkCount{ position:relative; margin-top:6px; font-size:13px; font-weight:700; color:#bfe0ff; }
 
   /* subtle idle "breathing" so she doesn't look frozen */
   #petSpriteWrap{ animation: petBreathe 3.2s ease-in-out infinite; }
@@ -1417,6 +1439,25 @@
     }, reconnectDelay);
   }
 
+  // ---------- card shine (короткий одноразовый блик, см. CSS .shine) ----------
+  // гасим мгновенно при потере видимости страницы, чтобы он не мог застыть
+  // на полпути и потом "всплыть" видимой полосой, когда вкладка/сцена снова
+  // станет видна
+  let shineTimer = null;
+  function triggerShine(){
+    if(document.hidden) return;
+    petCard.classList.add("shine");
+    setTimeout(() => petCard.classList.remove("shine"), 1400);
+  }
+  function scheduleShine(){
+    clearTimeout(shineTimer);
+    const delay = 9000 + Math.random()*5000;
+    shineTimer = setTimeout(() => { triggerShine(); scheduleShine(); }, delay);
+  }
+  document.addEventListener("visibilitychange", () => {
+    if(document.hidden) petCard.classList.remove("shine");
+  });
+
   // ---------- init ----------
   applyPetPosition();
   updatePetUI();
@@ -1428,6 +1469,7 @@
   if(!isDockSettings){
     scheduleNextPopup();
     setInterval(rotateHint, Math.max(5000, (cfg.hintRotationSeconds||45)*1000));
+    scheduleShine();
   }
 })();
 </script>
