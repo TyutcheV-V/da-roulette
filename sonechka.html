@@ -309,12 +309,12 @@
     <h3>Рост и молоко</h3>
     <div class="muted">Кормление и поглаживание наполняют сытость/счастье. Дойка наполняет отдельную синюю шкалу (🧪 на карточке) и каждый раз немного снижает счастье и сытость. Когда шкала дойки доходит до 100% — появляется бидон молока, и шкала обнуляется.</div>
     <div class="row">
-      <div><label>Сытость за кормление (при макс. донате)</label><input type="number" id="cfgFeedFullness" value="60"></div>
+      <div><label>Сытость за кормление (при макс. донате)</label><input type="number" id="cfgFeedFullness" value="100"></div>
       <div><label>Рост за кормление (при макс. донате)</label><input type="number" id="cfgFeedGrowth" value="0.2" step="0.1"></div>
     </div>
     <div class="row">
-      <div><label>Счастье за поглаживание (при макс. донате)</label><input type="number" id="cfgPetHappiness" value="60"></div>
-      <div><label>Заполнение шкалы дойки за дойку (при макс. донате)</label><input type="number" id="cfgMilkGaugeFill" value="40" min="1"></div>
+      <div><label>Счастье за поглаживание (при макс. донате)</label><input type="number" id="cfgPetHappiness" value="100"></div>
+      <div><label>Заполнение шкалы дойки за дойку (при макс. донате)</label><input type="number" id="cfgMilkGaugeFill" value="100" min="1"></div>
     </div>
     <div class="row">
       <div><label>Счастье за дойку, минус (при макс. донате)</label><input type="number" id="cfgMilkHappinessCost" value="10" min="0"></div>
@@ -434,10 +434,10 @@
       muteSound: false,
       soundVolume: 80,
       actions: DEFAULT_ACTIONS.map(a => Object.assign({}, a)),
-      feedFullnessStep: 60,
+      feedFullnessStep: 100,
       feedGrowthStep: 0.2,
-      petHappinessStep: 60,
-      milkGaugeFillPerDonation: 40, // насколько шкала дойки заполняется за один макс. донат
+      petHappinessStep: 100,
+      milkGaugeFillPerDonation: 100, // насколько шкала дойки заполняется за один макс. донат
       milkHappinessCost: 10,
       milkFullnessCost: 10,
       decayPerHour: 6.25,        // плавное падение счастья/сытости, очков в час (100/16ч = полностью за 16 часов)
@@ -776,10 +776,10 @@
     updateMuteBtn();
   });
   cfgSoundVolume.addEventListener("input", () => { cfg.soundVolume = Number(cfgSoundVolume.value)||0; saveConfig(); });
-  cfgFeedFullness.addEventListener("change", () => { cfg.feedFullnessStep = Number(cfgFeedFullness.value)||60; saveConfig(); });
+  cfgFeedFullness.addEventListener("change", () => { cfg.feedFullnessStep = Number(cfgFeedFullness.value)||100; saveConfig(); });
   cfgFeedGrowth.addEventListener("change", () => { cfg.feedGrowthStep = Number(cfgFeedGrowth.value)||0.2; saveConfig(); });
-  cfgPetHappiness.addEventListener("change", () => { cfg.petHappinessStep = Number(cfgPetHappiness.value)||60; saveConfig(); });
-  cfgMilkGaugeFill.addEventListener("change", () => { cfg.milkGaugeFillPerDonation = Number(cfgMilkGaugeFill.value)||40; saveConfig(); });
+  cfgPetHappiness.addEventListener("change", () => { cfg.petHappinessStep = Number(cfgPetHappiness.value)||100; saveConfig(); });
+  cfgMilkGaugeFill.addEventListener("change", () => { cfg.milkGaugeFillPerDonation = Number(cfgMilkGaugeFill.value)||100; saveConfig(); });
   cfgMilkHappinessCost.addEventListener("change", () => { cfg.milkHappinessCost = Number(cfgMilkHappinessCost.value)||0; saveConfig(); });
   cfgMilkFullnessCost.addEventListener("change", () => { cfg.milkFullnessCost = Number(cfgMilkFullnessCost.value)||0; saveConfig(); });
   cfgDecayPerHour.addEventListener("change", () => { cfg.decayPerHour = Number(cfgDecayPerHour.value)||0; saveConfig(); });
@@ -986,7 +986,7 @@
     cfg.lastInteractionAt = Date.now();
     const strength = donationStrength01(amount);
     if(action.effect === "feed"){
-      const gain = Number(cfg.feedFullnessStep||60)*strength;
+      const gain = Number(cfg.feedFullnessStep||100)*strength;
       const overflow = Math.max(0, cfg.fullness + gain - 100);
       cfg.fullness = Math.min(100, cfg.fullness + gain);
       cfg.growth = cfg.growth + Number(cfg.feedGrowthStep||0.2)*strength;
@@ -994,7 +994,7 @@
       showBubble(`${donorName}: ${pickPhrase(cfg.feedPhrases, "Ой как вкусно!")} 🌾`);
       playFile("sounds/feed.mp3");
     } else if(action.effect === "pet"){
-      const gain = Number(cfg.petHappinessStep||60)*strength;
+      const gain = Number(cfg.petHappinessStep||100)*strength;
       const overflow = Math.max(0, cfg.happiness + gain - 100);
       cfg.happiness = Math.min(100, cfg.happiness + gain);
       applyOverflowSlowdown(overflow, "happinessSlowUntil");
@@ -1003,7 +1003,7 @@
     } else if(action.effect === "milk"){
       // донат на дойку наполняет синюю шкалу напрямую и каждый раз немного
       // снижает счастье/сытость; при заполнении шкалы до 100% — бидон, шкала в ноль
-      const gaugeFill = Number(cfg.milkGaugeFillPerDonation||40)*strength;
+      const gaugeFill = Number(cfg.milkGaugeFillPerDonation||100)*strength;
       cfg.milkGauge = (cfg.milkGauge||0) + gaugeFill;
       cfg.happiness = Math.max(0, cfg.happiness - Number(cfg.milkHappinessCost||0)*strength);
       cfg.fullness = Math.max(0, cfg.fullness - Number(cfg.milkFullnessCost||0)*strength);
