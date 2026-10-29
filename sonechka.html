@@ -1,0 +1,890 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Сонечка</title>
+<style>
+  :root{
+    --accent: #ffd24d;
+    --panel-bg: rgba(15,15,20,0.92);
+    --card-navy-dark: #121a2c;
+    --card-navy-light: #1b2740;
+    --card-border: #37486c;
+  }
+  html,body{
+    margin:0; padding:0; background:transparent; overflow:hidden;
+    font-family: 'Segoe UI', Tahoma, Arial, sans-serif;
+    color:#fff; width:100%; height:100%;
+  }
+  #stage{ position:relative; width:100%; height:100%; }
+  body.dockMode{ background:#101018; }
+  body.dockMode #stage > *:not(#settingsPanel){ display:none !important; }
+  body.dockMode #settingsPanel{
+    position:static; display:block; width:100%; max-width:none; height:auto;
+    min-height:100vh; max-height:none; border-radius:0; box-shadow:none; box-sizing:border-box;
+  }
+
+  /* ---------- pet card ---------- */
+  #petCard{
+    position:absolute; width:190px; text-align:center;
+    background:var(--card-navy-dark); border:1px solid var(--card-border); border-radius:14px;
+    padding:10px 12px 12px; box-shadow:0 8px 26px rgba(0,0,0,.55);
+    transition: transform .2s ease;
+  }
+  #petCard.pos-bottom-right{ right:16px; bottom:16px; }
+  #petCard.pos-bottom-left{ left:16px; bottom:16px; }
+  #petCard.pos-top-right{ right:16px; top:16px; }
+  #petCard.pos-top-left{ left:16px; top:16px; }
+
+  #petSpriteWrap{
+    width:120px; height:120px; margin:0 auto 6px; border-radius:50%;
+    background:var(--card-navy-light); display:flex; align-items:center; justify-content:center;
+    overflow:hidden; border:2px solid var(--card-border);
+  }
+  #petSpriteImg{ width:100%; height:100%; object-fit:cover; display:none; }
+  #petSpriteFallback{ font-size:56px; line-height:1; }
+
+  #petName{ font-weight:800; font-size:14px; letter-spacing:.03em; margin-bottom:6px; text-transform:uppercase; }
+
+  .petBarRow{ display:flex; align-items:center; gap:6px; margin-bottom:4px; }
+  .petBarLabel{ font-size:13px; width:16px; text-align:center; flex:0 0 auto; }
+  .petBarTrack{ flex:1; height:8px; border-radius:4px; background:rgba(255,255,255,.1); overflow:hidden; }
+  .petBarFill{ height:100%; border-radius:4px; transition:width .5s ease; }
+  .petBarFill.happy{ background:linear-gradient(90deg,#ff5ec4,#ffd24d); }
+  .petBarFill.full{ background:linear-gradient(90deg,#4caf50,#8bffb0); }
+
+  #petMilkCount{ margin-top:6px; font-size:13px; font-weight:700; color:#bfe0ff; }
+
+  /* ---------- speech bubble ---------- */
+  #petBubble{
+    position:absolute; max-width:260px; padding:8px 12px; border-radius:12px;
+    background:rgba(18,26,44,.95); border:1px solid var(--card-border); font-size:13px; font-weight:600;
+    text-align:center; opacity:0; pointer-events:none; transition:opacity .3s ease, transform .3s ease;
+    transform:translateY(6px);
+  }
+  #petBubble.show{ opacity:1; transform:translateY(0); }
+  #petCard.pos-bottom-right ~ #petBubble, #petCard.pos-top-right ~ #petBubble{ right:16px; }
+  #petCard.pos-bottom-left ~ #petBubble, #petCard.pos-top-left ~ #petBubble{ left:16px; }
+  #petCard.pos-bottom-right ~ #petBubble, #petCard.pos-bottom-left ~ #petBubble{ bottom:190px; }
+  #petCard.pos-top-right ~ #petBubble, #petCard.pos-top-left ~ #petBubble{ top:190px; }
+
+  /* ---------- catch banner ---------- */
+  #catchBanner{
+    position:absolute; left:50%; top:24px; transform:translateX(-50%) translateY(-12px);
+    background:rgba(18,10,26,.92); border:2px solid #ff6a3d; border-radius:14px;
+    padding:12px 22px; font-size:18px; font-weight:800; text-align:center;
+    opacity:0; pointer-events:none; transition:opacity .25s ease, transform .25s ease;
+    box-shadow:0 0 24px rgba(255,106,61,.5);
+  }
+  #catchBanner.show{ opacity:1; transform:translateX(-50%) translateY(0); }
+  #catchCmdLabel{ color:#ffd24d; }
+
+  /* ---------- milk flood overlay ---------- */
+  #floodOverlay{
+    position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+    background:radial-gradient(ellipse at center, rgba(255,255,255,.96), rgba(255,250,235,.88) 55%, rgba(255,245,220,.75));
+    opacity:0; pointer-events:none; transition:opacity .4s ease;
+  }
+  #floodOverlay.show{ opacity:1; animation:floodWash 1.4s ease-out; }
+  @keyframes floodWash{
+    0%{ clip-path: circle(0% at 50% 100%); }
+    100%{ clip-path: circle(150% at 50% 100%); }
+  }
+  #floodText{
+    font-size:40px; font-weight:900; color:#1a1030; text-align:center; max-width:90%;
+    text-shadow:0 2px 0 #fff, 0 4px 14px rgba(0,0,0,.25); line-height:1.2;
+  }
+
+  /* ---------- gear / settings (same pattern as the roulette widget) ---------- */
+  #secretCorner{ position:absolute; top:0; left:0; width:34px; height:34px; z-index:60; background:transparent; }
+  #gearBtn{
+    display:none; position:absolute; right:10px; bottom:10px; width:34px; height:34px; border-radius:50%;
+    background:rgba(0,0,0,.4); border:1px solid rgba(255,255,255,.25); color:#fff; font-size:18px;
+    cursor:pointer; align-items:center; justify-content:center; opacity:.35; transition:opacity .2s ease;
+  }
+  #gearBtn:hover{ opacity:1; }
+  body.editMode #gearBtn{ display:flex; }
+
+  #settingsPanel{
+    position:absolute; right:10px; bottom:54px; width:420px; max-width:92vw; max-height:85vh;
+    overflow:auto; background:var(--panel-bg); border-radius:14px; padding:16px 18px;
+    box-shadow:0 10px 40px rgba(0,0,0,.6); display:none; font-size:13px; line-height:1.4;
+  }
+  #settingsPanel.open{ display:block; }
+  #settingsPanel h3{ margin:14px 0 6px; font-size:14px; color:var(--accent); }
+  #settingsPanel h3:first-child{ margin-top:0; }
+  #settingsPanel label{ display:block; margin:8px 0 3px; color:#cfcfcf; }
+  #settingsPanel input[type=text], #settingsPanel input[type=number], #settingsPanel select, #settingsPanel textarea{
+    width:100%; box-sizing:border-box; padding:6px 8px; border-radius:6px; border:1px solid #444;
+    background:#1b1b22; color:#fff; font-size:13px;
+  }
+  #settingsPanel button{
+    cursor:pointer; border:none; border-radius:7px; padding:7px 12px; font-size:13px; font-weight:600;
+    background:#3d3d4d; color:#fff; margin:4px 4px 0 0;
+  }
+  #settingsPanel button.primary{ background:linear-gradient(90deg,#ff5ec4,#7c4dff); }
+  #settingsPanel button.danger{ background:#8a2d2d; }
+  #settingsPanel .row{ display:flex; gap:8px; }
+  #settingsPanel .row > *{ flex:1; }
+  .muted{ color:#888; font-size:11px; }
+  #authStatus{ font-size:12px; padding:6px 8px; border-radius:6px; background:#1b1b22; margin-top:4px; }
+  #authStatus.ok{ color:#8bffb0; }
+  #authStatus.bad{ color:#ff9b9b; }
+
+  #actionsGrid{ display:flex; flex-direction:column; gap:8px; margin-top:6px; }
+  .actionCard{ background:#1b1b22; border-radius:10px; padding:10px; border-left:4px solid #7c4dff; }
+  .actionHeader{ display:flex; align-items:center; gap:4px; margin-bottom:6px; }
+  .actionHeader input.actionName{ flex:1; background:transparent; border:none; color:#fff; font-weight:700; font-size:13px; padding:3px 4px; }
+  .actionIconBtn{ background:none; border:none; color:#ccc; cursor:pointer; font-size:14px; padding:2px 5px; border-radius:5px; }
+  .actionIconBtn:hover{ background:#2a2a33; }
+  .actionIconBtn.danger{ color:#ff8080; }
+  .actionRow2{ display:flex; gap:6px; margin-bottom:6px; }
+  .actionRow2 select, .actionRow2 input{ margin:0; }
+
+  #statsBox{ margin-top:6px; font-size:12px; }
+  #statsBox .statsCol{ display:inline-block; vertical-align:top; width:48%; }
+  #statsBox ol{ margin:4px 0; padding-left:18px; }
+</style>
+</head>
+<body>
+<div id="stage">
+  <div id="floodOverlay"><div id="floodText"></div></div>
+  <div id="catchBanner">🥛 Лови команду <span id="catchCmdLabel">!ловлю</span>!</div>
+
+  <div id="petCard" class="pos-bottom-right">
+    <div id="petSpriteWrap">
+      <img id="petSpriteImg" alt="Сонечка">
+      <div id="petSpriteFallback">🐐</div>
+    </div>
+    <div id="petName">Сонечка</div>
+    <div class="petBarRow"><span class="petBarLabel">💛</span><div class="petBarTrack"><div id="petHappyBar" class="petBarFill happy"></div></div></div>
+    <div class="petBarRow"><span class="petBarLabel">🍽</span><div class="petBarTrack"><div id="petFullBar" class="petBarFill full"></div></div></div>
+    <div id="petMilkCount">🥛 0 / 10</div>
+  </div>
+
+  <div id="petBubble"></div>
+
+  <div id="secretCorner"></div>
+  <button id="gearBtn" title="Настройки">⚙</button>
+
+  <div id="settingsPanel">
+    <h3>DonationAlerts</h3>
+    <div class="muted">Использует тот же вход, что и виджет рулетки (если уже логинился там — входить заново не нужно).</div>
+    <label>Client ID вашего приложения</label>
+    <input type="text" id="cfgClientId" placeholder="например 12345">
+    <label>Redirect URI — должен совпадать с тем, что указан в приложении на DonationAlerts</label>
+    <input type="text" id="redirectUriShow" readonly>
+    <label>Адрес прокси (тот же, что для рулетки)</label>
+    <input type="text" id="cfgProxyUrl" placeholder="например https://da-roulette.vercel.app">
+    <div class="row" style="margin-top:8px;">
+      <button class="primary" id="loginBtn">Войти через DonationAlerts</button>
+      <button class="danger" id="logoutBtn">Выйти</button>
+    </div>
+    <div id="authStatus">не подключено</div>
+
+    <h3>Twitch-чат</h3>
+    <label>Имя канала (без @ и без twitch.tv/)</label>
+    <input type="text" id="cfgTwitchChannel" placeholder="например tyutchev_v">
+    <label>Команда для ловли молока</label>
+    <input type="text" id="cfgCatchCommand" value="!ловлю">
+    <label>Сколько секунд ловим (окно команды)</label>
+    <input type="number" id="cfgCatchWindow" value="10" min="3" max="60">
+
+    <h3>Расположение и звук</h3>
+    <label>Угол экрана</label>
+    <select id="cfgCornerPosition">
+      <option value="pos-bottom-right">Снизу справа</option>
+      <option value="pos-bottom-left">Снизу слева</option>
+      <option value="pos-top-right">Сверху справа</option>
+      <option value="pos-top-left">Сверху слева</option>
+    </select>
+    <label><input type="checkbox" id="cfgMuteSound" style="width:auto;"> выключить звук</label>
+    <label>Громкость</label>
+    <input type="range" id="cfgSoundVolume" min="0" max="100" value="80">
+
+    <h3>Действия по донату</h3>
+    <div class="muted">Сонечка реагирует, если в сообщении доната есть одно из ключевых слов (через запятую) И сумма не меньше порога.</div>
+    <div id="actionsGrid"></div>
+    <button class="smallBtn" id="addActionBtn" style="margin-top:8px;">+ добавить действие</button>
+
+    <h3>Рост и молоко</h3>
+    <div class="row">
+      <div><label>Сытость за кормление</label><input type="number" id="cfgFeedFullness" value="20"></div>
+      <div><label>Рост за кормление</label><input type="number" id="cfgFeedGrowth" value="0.2" step="0.1"></div>
+    </div>
+    <div class="row">
+      <div><label>Счастье за поглаживание</label><input type="number" id="cfgPetHappiness" value="20"></div>
+      <div><label>Бидонов за дойку (база)</label><input type="number" id="cfgMilkBase" value="1" min="1"></div>
+    </div>
+    <label>Множитель молока за уровень роста (0.5 = +50% за уровень)</label>
+    <input type="number" id="cfgMilkGrowthFactor" value="0.5" step="0.1" min="0">
+
+    <h3>Голод и грусть без донатов</h3>
+    <div class="row">
+      <div><label>Проверка раз в, часов</label><input type="number" id="cfgDecayHours" value="6" min="1"></div>
+      <div><label>Насколько падает</label><input type="number" id="cfgDecayStep" value="10" min="1"></div>
+    </div>
+
+    <h3>Заливка молоком</h3>
+    <div class="row">
+      <div><label>Бидонов до заливки</label><input type="number" id="cfgFloodThreshold" value="10" min="1"></div>
+      <div><label>Держать на экране, сек</label><input type="number" id="cfgFloodHold" value="6" min="1"></div>
+    </div>
+    <label><input type="checkbox" id="cfgFloodCarryOver" style="width:auto;" checked> переносить остаток бидонов на новый круг</label>
+    <label>Текст на весь экран</label>
+    <input type="text" id="cfgFloodText" value="СОНЕЧКА ЗАЛИВАЕТ ВАС МОЛОЧКОМ ОТКРЫВАЙТЕ РОТИК">
+
+    <h3>Статистика</h3>
+    <div class="row">
+      <button id="refreshStatsBtn">Обновить статистику</button>
+      <button id="resetPetBtn">Сбросить состояние Сонечки</button>
+    </div>
+    <div id="statsBox">
+      <div class="statsCol"><b>Топ донатеров на молоко</b><ol id="statsDonors"></ol></div>
+      <div class="statsCol"><b>Топ по выпитому молоку</b><ol id="statsDrinkers"></ol></div>
+    </div>
+
+    <h3>Тест</h3>
+    <div class="row">
+      <input type="text" id="testDonorName" placeholder="Имя донатера" value="Тестер">
+      <input type="number" id="testAmount" placeholder="Сумма" value="500">
+    </div>
+    <input type="text" id="testMessage" placeholder="Сообщение доната, например: подоить сонечку" style="margin-top:6px;">
+    <div class="row" style="margin-top:6px;">
+      <button id="testDonateBtn">Тестовый донат</button>
+      <button id="testFloodBtn">Проверить заливку</button>
+    </div>
+
+    <h3>Экспорт / импорт настроек</h3>
+    <div class="muted">Чтобы перенести настройки Сонечки (включая Twitch-канал и действия) между браузером и OBS: «Экспорт» → скопировать → вставить в поле ниже внутри OBS (режим Interact) → «Импорт». Вход в DonationAlerts переносится отдельно вместе с виджетом рулетки.</div>
+    <textarea id="ioBox" placeholder="JSON настроек появится здесь после экспорта"></textarea>
+    <div class="row">
+      <button id="exportBtn">Экспорт</button>
+      <button id="importBtn">Импорт</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  const ROULETTE_STORE_KEY = "da_roulette_cfg_v2"; // shared DonationAlerts login
+  const STORE_KEY = "da_sonechka_cfg_v1";
+
+  const urlParams = new URLSearchParams(location.search);
+  const isDockSettings = urlParams.get("view") === "settings";
+  const editMode = urlParams.get("edit") === "1";
+
+  const DEFAULT_ACTIONS = [
+    {id:1, name:"Подоить", effect:"milk", keywords:"подоить, подои, подои сонечку, молоко", minAmount:500, enabled:true},
+    {id:2, name:"Покормить", effect:"feed", keywords:"покормить, корм, покорми", minAmount:200, enabled:true},
+    {id:3, name:"Погладить", effect:"pet", keywords:"погладить, гладить, глажу, ласка", minAmount:100, enabled:true}
+  ];
+
+  function defaultConfig(){
+    return {
+      cornerPosition: "pos-bottom-right",
+      twitchChannel: "",
+      catchCommand: "!ловлю",
+      catchWindowSeconds: 10,
+      muteSound: false,
+      soundVolume: 80,
+      actions: DEFAULT_ACTIONS.map(a => Object.assign({}, a)),
+      feedFullnessStep: 20,
+      feedGrowthStep: 0.2,
+      petHappinessStep: 20,
+      milkBaseYield: 1,
+      milkGrowthFactor: 0.5,
+      decayCheckHours: 6,
+      decayStep: 10,
+      floodThreshold: 10,
+      floodHoldSeconds: 6,
+      floodCarryOver: true,
+      floodText: "СОНЕЧКА ЗАЛИВАЕТ ВАС МОЛОЧКОМ ОТКРЫВАЙТЕ РОТИК",
+      // runtime pet state, persisted alongside settings
+      happiness: 70,
+      fullness: 70,
+      growth: 1,
+      milkCans: 0,
+      lastInteractionAt: Date.now(),
+      lastDecayTickAt: Date.now()
+    };
+  }
+
+  function loadConfig(){
+    try{
+      const raw = localStorage.getItem(STORE_KEY);
+      if(!raw) return defaultConfig();
+      return Object.assign(defaultConfig(), JSON.parse(raw));
+    }catch(e){ return defaultConfig(); }
+  }
+
+  let cfg = loadConfig();
+  function saveConfig(){ localStorage.setItem(STORE_KEY, JSON.stringify(cfg)); }
+
+  // ---------- shared DonationAlerts credentials (same key the roulette widget uses) ----------
+  function loadDA(){
+    try{
+      const raw = localStorage.getItem(ROULETTE_STORE_KEY);
+      const parsed = raw ? JSON.parse(raw) : {};
+      return {
+        clientId: parsed.clientId || "",
+        accessToken: parsed.accessToken || "",
+        tokenExpiresAt: parsed.tokenExpiresAt || 0,
+        userId: parsed.userId || null,
+        proxyUrl: parsed.proxyUrl || ""
+      };
+    }catch(e){
+      return { clientId:"", accessToken:"", tokenExpiresAt:0, userId:null, proxyUrl:"" };
+    }
+  }
+  function saveDA(patch){
+    let full;
+    try{ full = JSON.parse(localStorage.getItem(ROULETTE_STORE_KEY)) || {}; }catch(e){ full = {}; }
+    Object.assign(full, patch);
+    localStorage.setItem(ROULETTE_STORE_KEY, JSON.stringify(full));
+  }
+  let da = loadDA();
+
+  // ---------- DOM refs ----------
+  const floodOverlay = document.getElementById("floodOverlay");
+  const floodText = document.getElementById("floodText");
+  const catchBanner = document.getElementById("catchBanner");
+  const catchCmdLabel = document.getElementById("catchCmdLabel");
+  const petCard = document.getElementById("petCard");
+  const petSpriteImg = document.getElementById("petSpriteImg");
+  const petSpriteFallback = document.getElementById("petSpriteFallback");
+  const petHappyBar = document.getElementById("petHappyBar");
+  const petFullBar = document.getElementById("petFullBar");
+  const petMilkCount = document.getElementById("petMilkCount");
+  const petBubble = document.getElementById("petBubble");
+
+  const secretCorner = document.getElementById("secretCorner");
+  const gearBtn = document.getElementById("gearBtn");
+  const settingsPanel = document.getElementById("settingsPanel");
+
+  const cfgClientId = document.getElementById("cfgClientId");
+  const redirectUriShow = document.getElementById("redirectUriShow");
+  const cfgProxyUrl = document.getElementById("cfgProxyUrl");
+  const loginBtn = document.getElementById("loginBtn");
+  const logoutBtn = document.getElementById("logoutBtn");
+  const authStatus = document.getElementById("authStatus");
+
+  const cfgTwitchChannel = document.getElementById("cfgTwitchChannel");
+  const cfgCatchCommand = document.getElementById("cfgCatchCommand");
+  const cfgCatchWindow = document.getElementById("cfgCatchWindow");
+  const cfgCornerPosition = document.getElementById("cfgCornerPosition");
+  const cfgMuteSound = document.getElementById("cfgMuteSound");
+  const cfgSoundVolume = document.getElementById("cfgSoundVolume");
+
+  const actionsGrid = document.getElementById("actionsGrid");
+  const addActionBtn = document.getElementById("addActionBtn");
+
+  const cfgFeedFullness = document.getElementById("cfgFeedFullness");
+  const cfgFeedGrowth = document.getElementById("cfgFeedGrowth");
+  const cfgPetHappiness = document.getElementById("cfgPetHappiness");
+  const cfgMilkBase = document.getElementById("cfgMilkBase");
+  const cfgMilkGrowthFactor = document.getElementById("cfgMilkGrowthFactor");
+  const cfgDecayHours = document.getElementById("cfgDecayHours");
+  const cfgDecayStep = document.getElementById("cfgDecayStep");
+  const cfgFloodThreshold = document.getElementById("cfgFloodThreshold");
+  const cfgFloodHold = document.getElementById("cfgFloodHold");
+  const cfgFloodCarryOver = document.getElementById("cfgFloodCarryOver");
+  const cfgFloodText = document.getElementById("cfgFloodText");
+
+  const refreshStatsBtn = document.getElementById("refreshStatsBtn");
+  const resetPetBtn = document.getElementById("resetPetBtn");
+  const statsDonors = document.getElementById("statsDonors");
+  const statsDrinkers = document.getElementById("statsDrinkers");
+
+  const testDonorName = document.getElementById("testDonorName");
+  const testAmount = document.getElementById("testAmount");
+  const testMessage = document.getElementById("testMessage");
+  const testDonateBtn = document.getElementById("testDonateBtn");
+  const testFloodBtn = document.getElementById("testFloodBtn");
+
+  const exportBtn = document.getElementById("exportBtn");
+  const importBtn = document.getElementById("importBtn");
+  const ioBox = document.getElementById("ioBox");
+
+  const redirectUri = location.origin + location.pathname;
+  redirectUriShow.value = redirectUri;
+
+  document.body.classList.toggle("editMode", editMode);
+  document.body.classList.toggle("dockMode", isDockSettings);
+
+  // ---------- settings open/close ----------
+  function toggleSettingsPanel(){
+    settingsPanel.classList.toggle("open");
+    if(settingsPanel.classList.contains("open")) renderSettingsForm();
+  }
+  gearBtn.addEventListener("click", toggleSettingsPanel);
+  secretCorner.addEventListener("click", toggleSettingsPanel);
+
+  function escapeHtml(s){
+    return String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+  }
+  function parseKeywords(text){
+    return String(text||"").split(",").map(s=>s.trim().toLowerCase()).filter(Boolean);
+  }
+
+  function renderSettingsForm(){
+    da = loadDA();
+    cfgClientId.value = da.clientId || "";
+    cfgProxyUrl.value = da.proxyUrl || "";
+    cfgTwitchChannel.value = cfg.twitchChannel || "";
+    cfgCatchCommand.value = cfg.catchCommand;
+    cfgCatchWindow.value = cfg.catchWindowSeconds;
+    cfgCornerPosition.value = cfg.cornerPosition;
+    cfgMuteSound.checked = !!cfg.muteSound;
+    cfgSoundVolume.value = cfg.soundVolume;
+    cfgFeedFullness.value = cfg.feedFullnessStep;
+    cfgFeedGrowth.value = cfg.feedGrowthStep;
+    cfgPetHappiness.value = cfg.petHappinessStep;
+    cfgMilkBase.value = cfg.milkBaseYield;
+    cfgMilkGrowthFactor.value = cfg.milkGrowthFactor;
+    cfgDecayHours.value = cfg.decayCheckHours;
+    cfgDecayStep.value = cfg.decayStep;
+    cfgFloodThreshold.value = cfg.floodThreshold;
+    cfgFloodHold.value = cfg.floodHoldSeconds;
+    cfgFloodCarryOver.checked = !!cfg.floodCarryOver;
+    cfgFloodText.value = cfg.floodText;
+    renderAuthStatus();
+    renderActions();
+  }
+
+  function renderAuthStatus(){
+    if(da.accessToken && da.tokenExpiresAt > Date.now()){
+      authStatus.textContent = "подключено, user_id=" + (da.userId || "?");
+      authStatus.className = "ok";
+    } else if(da.accessToken){
+      authStatus.textContent = "токен истёк — войдите заново";
+      authStatus.className = "bad";
+    } else {
+      authStatus.textContent = "не подключено";
+      authStatus.className = "";
+    }
+  }
+
+  function renderActions(){
+    actionsGrid.innerHTML = "";
+    cfg.actions.forEach((a, idx) => {
+      const card = document.createElement("div");
+      card.className = "actionCard";
+      card.innerHTML = `
+        <div class="actionHeader">
+          <input type="text" class="actionName" data-idx="${idx}" data-field="name" value="${escapeHtml(a.name)}">
+          <button class="actionIconBtn" data-idx="${idx}" data-action="toggle" title="${a.enabled!==false?"Выключить":"Включить"}">${a.enabled!==false?"👁":"🚫"}</button>
+          <button class="actionIconBtn danger" data-idx="${idx}" data-action="del" title="Удалить">✕</button>
+        </div>
+        <div class="actionRow2">
+          <select data-idx="${idx}" data-field="effect">
+            <option value="milk" ${a.effect==="milk"?"selected":""}>🥛 Молоко</option>
+            <option value="feed" ${a.effect==="feed"?"selected":""}>🌾 Кормление</option>
+            <option value="pet" ${a.effect==="pet"?"selected":""}>💛 Поглаживание</option>
+          </select>
+          <input type="number" data-idx="${idx}" data-field="minAmount" value="${a.minAmount}" min="0" placeholder="мин. сумма">
+        </div>
+        <input type="text" data-idx="${idx}" data-field="keywords" value="${escapeHtml(a.keywords)}" placeholder="ключевые слова через запятую">
+      `;
+      actionsGrid.appendChild(card);
+    });
+  }
+
+  actionsGrid.addEventListener("input", (e) => {
+    const t = e.target;
+    const idx = Number(t.dataset.idx);
+    const field = t.dataset.field;
+    if(field == null || Number.isNaN(idx)) return;
+    if(field === "minAmount") cfg.actions[idx][field] = Number(t.value)||0;
+    else cfg.actions[idx][field] = t.value;
+    saveConfig();
+  });
+  actionsGrid.addEventListener("click", (e) => {
+    const t = e.target.closest("[data-action]");
+    if(!t) return;
+    const idx = Number(t.dataset.idx);
+    if(Number.isNaN(idx)) return;
+    if(t.dataset.action === "del"){ cfg.actions.splice(idx,1); renderActions(); saveConfig(); }
+    else if(t.dataset.action === "toggle"){ cfg.actions[idx].enabled = cfg.actions[idx].enabled===false; renderActions(); saveConfig(); }
+  });
+  addActionBtn.addEventListener("click", () => {
+    cfg.actions.push({id:Date.now(), name:"Новое действие", effect:"pet", keywords:"", minAmount:100, enabled:true});
+    renderActions(); saveConfig();
+  });
+
+  cfgClientId.addEventListener("change", () => { saveDA({clientId: cfgClientId.value.trim()}); da = loadDA(); });
+  cfgProxyUrl.addEventListener("change", () => { saveDA({proxyUrl: cfgProxyUrl.value.trim().replace(/\/$/,"")}); da = loadDA(); });
+  cfgTwitchChannel.addEventListener("change", () => { cfg.twitchChannel = cfgTwitchChannel.value.trim(); saveConfig(); connectTwitch(); });
+  cfgCatchCommand.addEventListener("change", () => { cfg.catchCommand = cfgCatchCommand.value.trim() || "!ловлю"; saveConfig(); });
+  cfgCatchWindow.addEventListener("change", () => { cfg.catchWindowSeconds = Number(cfgCatchWindow.value)||10; saveConfig(); });
+  cfgCornerPosition.addEventListener("change", () => {
+    cfg.cornerPosition = cfgCornerPosition.value; saveConfig();
+    petCard.className = cfg.cornerPosition;
+  });
+  cfgMuteSound.addEventListener("change", () => { cfg.muteSound = cfgMuteSound.checked; saveConfig(); });
+  cfgSoundVolume.addEventListener("input", () => { cfg.soundVolume = Number(cfgSoundVolume.value)||0; saveConfig(); });
+  cfgFeedFullness.addEventListener("change", () => { cfg.feedFullnessStep = Number(cfgFeedFullness.value)||20; saveConfig(); });
+  cfgFeedGrowth.addEventListener("change", () => { cfg.feedGrowthStep = Number(cfgFeedGrowth.value)||0.2; saveConfig(); });
+  cfgPetHappiness.addEventListener("change", () => { cfg.petHappinessStep = Number(cfgPetHappiness.value)||20; saveConfig(); });
+  cfgMilkBase.addEventListener("change", () => { cfg.milkBaseYield = Number(cfgMilkBase.value)||1; saveConfig(); });
+  cfgMilkGrowthFactor.addEventListener("change", () => { cfg.milkGrowthFactor = Number(cfgMilkGrowthFactor.value)||0; saveConfig(); });
+  cfgDecayHours.addEventListener("change", () => { cfg.decayCheckHours = Number(cfgDecayHours.value)||6; saveConfig(); });
+  cfgDecayStep.addEventListener("change", () => { cfg.decayStep = Number(cfgDecayStep.value)||10; saveConfig(); });
+  cfgFloodThreshold.addEventListener("change", () => { cfg.floodThreshold = Number(cfgFloodThreshold.value)||10; saveConfig(); updatePetUI(); });
+  cfgFloodHold.addEventListener("change", () => { cfg.floodHoldSeconds = Number(cfgFloodHold.value)||6; saveConfig(); });
+  cfgFloodCarryOver.addEventListener("change", () => { cfg.floodCarryOver = cfgFloodCarryOver.checked; saveConfig(); });
+  cfgFloodText.addEventListener("change", () => { cfg.floodText = cfgFloodText.value || "СОНЕЧКА ЗАЛИВАЕТ ВАС МОЛОЧКОМ"; saveConfig(); });
+
+  resetPetBtn.addEventListener("click", () => {
+    Object.assign(cfg, { happiness:70, fullness:70, growth:1, milkCans:0, lastInteractionAt:Date.now(), lastDecayTickAt:Date.now() });
+    saveConfig(); updatePetUI();
+  });
+
+  // ---------- OAuth (writes into the SHARED roulette config key) ----------
+  loginBtn.addEventListener("click", () => {
+    const clientId = cfgClientId.value.trim();
+    if(!clientId){ alert("Сначала укажите Client ID приложения"); return; }
+    saveDA({clientId});
+    const scope = encodeURIComponent("oauth-user-show oauth-donation-subscribe oauth-donation-index");
+    const url = `https://www.donationalerts.com/oauth/authorize?client_id=${encodeURIComponent(clientId)}`
+      + `&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=token&scope=${scope}`;
+    location.href = url;
+  });
+  logoutBtn.addEventListener("click", () => {
+    saveDA({accessToken:"", tokenExpiresAt:0, userId:null});
+    da = loadDA();
+    renderAuthStatus();
+    if(ws) try{ ws.close(); }catch(e){}
+  });
+  function parseAuthHash(){
+    if(!location.hash || location.hash.length < 2) return;
+    const params = new URLSearchParams(location.hash.slice(1));
+    const token = params.get("access_token");
+    if(token){
+      const expiresIn = Number(params.get("expires_in")) || 3600*24*30;
+      saveDA({ accessToken: token, tokenExpiresAt: Date.now() + expiresIn*1000 });
+      da = loadDA();
+      history.replaceState(null, "", location.pathname + location.search);
+    }
+  }
+  parseAuthHash();
+
+  // ---------- export / import (Sonechka's own settings only) ----------
+  exportBtn.addEventListener("click", () => { ioBox.value = JSON.stringify(cfg, null, 2); ioBox.select(); });
+  importBtn.addEventListener("click", () => {
+    try{
+      const parsed = JSON.parse(ioBox.value);
+      cfg = Object.assign(defaultConfig(), parsed);
+      saveConfig();
+      renderSettingsForm();
+      updatePetUI();
+      petCard.className = cfg.cornerPosition;
+      connectTwitch();
+      alert("Настройки импортированы");
+    }catch(e){ alert("Не получилось разобрать JSON: " + e.message); }
+  });
+
+  // ---------- sound (plays files the user drops into sounds/, silently skipped if missing) ----------
+  function playFile(path){
+    if(cfg.muteSound) return;
+    try{
+      const audio = new Audio(path);
+      audio.volume = Math.max(0, Math.min(1, (cfg.soundVolume||0)/100));
+      audio.play().catch(()=>{});
+    }catch(e){}
+  }
+
+  // ---------- sprite (images/sonechka-1..5.png, falls back to an emoji if missing) ----------
+  function moodTier(){
+    const avg = (cfg.happiness + cfg.fullness) / 2;
+    if(avg < 20) return 1;
+    if(avg < 40) return 2;
+    if(avg < 60) return 3;
+    if(avg < 80) return 4;
+    return 5;
+  }
+  petSpriteImg.addEventListener("error", () => {
+    petSpriteImg.style.display = "none";
+    petSpriteFallback.style.display = "flex";
+  });
+  function updateSprite(){
+    petSpriteFallback.style.display = "none";
+    petSpriteImg.style.display = "block";
+    petSpriteImg.src = `images/sonechka-${moodTier()}.png`;
+  }
+
+  function updatePetUI(){
+    updateSprite();
+    petHappyBar.style.width = Math.max(0,Math.min(100,cfg.happiness)) + "%";
+    petFullBar.style.width = Math.max(0,Math.min(100,cfg.fullness)) + "%";
+    petMilkCount.textContent = `🥛 ${Math.floor(cfg.milkCans)} / ${cfg.floodThreshold}`;
+  }
+
+  let bubbleTimer = null;
+  function showBubble(text){
+    petBubble.textContent = text;
+    petBubble.classList.add("show");
+    clearTimeout(bubbleTimer);
+    bubbleTimer = setTimeout(() => petBubble.classList.remove("show"), 4500);
+  }
+
+  // ---------- stats (Upstash Redis via the proxy's /api/stats, no-ops gracefully if not set up yet) ----------
+  function statsEndpoint(){
+    return da.proxyUrl ? `${da.proxyUrl}/api/stats` : null;
+  }
+  async function postStat(type, name, amount){
+    const url = statsEndpoint();
+    if(!url) return;
+    try{
+      await fetch(url, {
+        method:"POST", headers:{ "Content-Type":"application/json" },
+        body: JSON.stringify({ type, name, amount })
+      });
+    }catch(e){ console.warn("stats post failed", e); }
+  }
+  async function fetchStats(){
+    const url = statsEndpoint();
+    if(!url) return;
+    try{
+      const r = await fetch(url);
+      if(!r.ok) return;
+      const json = await r.json();
+      renderStatsList(statsDonors, json.donors);
+      renderStatsList(statsDrinkers, json.drinkers);
+    }catch(e){ console.warn("stats fetch failed", e); }
+  }
+  function renderStatsList(el, items){
+    el.innerHTML = "";
+    (items||[]).slice(0,10).forEach(it => {
+      const li = document.createElement("li");
+      li.textContent = `${it.name} — ${Math.round(it.score)}`;
+      el.appendChild(li);
+    });
+  }
+  refreshStatsBtn.addEventListener("click", fetchStats);
+
+  // ---------- pet action logic ----------
+  function handlePetDonation(amount, rawMessage, donorName){
+    const text = String(rawMessage||"").toLowerCase();
+    const action = (cfg.actions||[]).find(a =>
+      a.enabled !== false &&
+      amount >= Number(a.minAmount||0) &&
+      parseKeywords(a.keywords).some(kw => kw && text.includes(kw))
+    );
+    if(!action) return;
+    applyPetAction(action, amount, donorName || "Донатер");
+  }
+
+  function applyPetAction(action, amount, donorName){
+    cfg.lastInteractionAt = Date.now();
+    if(action.effect === "feed"){
+      cfg.fullness = Math.min(100, cfg.fullness + Number(cfg.feedFullnessStep||20));
+      cfg.growth = cfg.growth + Number(cfg.feedGrowthStep||0.2);
+      cfg.happiness = Math.min(100, cfg.happiness + 5);
+      showBubble(`${donorName} покормил(а) Сонечку! 🌾`);
+      playFile("sounds/feed.mp3");
+    } else if(action.effect === "pet"){
+      cfg.happiness = Math.min(100, cfg.happiness + Number(cfg.petHappinessStep||20));
+      showBubble(`${donorName} погладил(а) Сонечку! 💛`);
+      playFile("sounds/pet.mp3");
+    } else if(action.effect === "milk"){
+      const yieldAmount = Math.max(1, Math.round(Number(cfg.milkBaseYield||1) * (1 + (cfg.growth-1)*Number(cfg.milkGrowthFactor||0.5))));
+      cfg.happiness = Math.min(100, cfg.happiness + 5);
+      cfg.milkCans += yieldAmount;
+      postStat("donor", donorName, amount);
+      playFile("sounds/milk.mp3");
+      startCatchRound(yieldAmount, donorName);
+      if(cfg.milkCans >= cfg.floodThreshold) triggerFlood();
+    }
+    saveConfig();
+    updatePetUI();
+  }
+
+  function triggerFlood(){
+    cfg.milkCans = cfg.floodCarryOver ? Math.max(0, cfg.milkCans - cfg.floodThreshold) : 0;
+    saveConfig();
+    floodText.textContent = cfg.floodText;
+    floodOverlay.classList.add("show");
+    playFile("sounds/flood.mp3");
+    setTimeout(() => floodOverlay.classList.remove("show"), (cfg.floodHoldSeconds||6)*1000);
+    updatePetUI();
+  }
+
+  let activeCatchRound = null;
+  function startCatchRound(milkAmount, donorName){
+    showBubble(`🥛 Сонечка брызгает молоком! Лови командой ${cfg.catchCommand}`);
+    catchCmdLabel.textContent = cfg.catchCommand;
+    catchBanner.classList.add("show");
+    activeCatchRound = { active:true, catchers:new Map() };
+    const round = activeCatchRound;
+    setTimeout(() => {
+      if(activeCatchRound === round) activeCatchRound = null;
+      catchBanner.classList.remove("show");
+      const names = Array.from(round.catchers.values());
+      if(names.length){
+        const winner = names[Math.floor(Math.random()*names.length)];
+        showBubble(`Молоко досталось ${winner}! 🥛`);
+        postStat("drinker", winner, milkAmount);
+      } else {
+        showBubble("Молоко никто не поймал, разлилось...");
+      }
+      fetchStats();
+    }, (cfg.catchWindowSeconds||10)*1000);
+  }
+
+  // ---------- decay over time (neglect) ----------
+  function applyDecayIfDue(){
+    const ms = cfg.decayCheckHours * 3600000;
+    const ticks = Math.floor((Date.now() - cfg.lastDecayTickAt) / ms);
+    if(ticks > 0){
+      cfg.happiness = Math.max(0, cfg.happiness - ticks*cfg.decayStep);
+      cfg.fullness = Math.max(0, cfg.fullness - ticks*cfg.decayStep);
+      cfg.lastDecayTickAt += ticks * ms;
+      saveConfig();
+      updatePetUI();
+    }
+  }
+  setInterval(applyDecayIfDue, 5*60*1000);
+
+  // ---------- test tools ----------
+  testDonateBtn.addEventListener("click", () => {
+    const amount = Number(testAmount.value) || 0;
+    if(amount <= 0) return;
+    handlePetDonation(amount, testMessage.value, testDonorName.value || "Тестер");
+  });
+  testFloodBtn.addEventListener("click", () => {
+    cfg.milkCans = cfg.floodThreshold;
+    saveConfig();
+    triggerFlood();
+  });
+
+  // ---------- DonationAlerts realtime (own connection — reads amount + message + username) ----------
+  let ws = null, reconnectDelay = 1000, msgId = 1, reconnectTimer = null;
+  function daApiUrl(path){
+    if(da.proxyUrl) return `${da.proxyUrl}/api/da-proxy?path=${encodeURIComponent(path)}`;
+    return `https://www.donationalerts.com/api/v1/${path}`;
+  }
+  async function connectRealtime(){
+    da = loadDA();
+    if(!da.accessToken) return;
+    if(da.tokenExpiresAt && da.tokenExpiresAt < Date.now()) return;
+    try{
+      const userResp = await fetch(daApiUrl("user/oauth"), { headers:{ Authorization:"Bearer "+da.accessToken } });
+      if(!userResp.ok) throw new Error("user/oauth " + userResp.status);
+      const userJson = await userResp.json();
+      openSocket(userJson.data.socket_connection_token, userJson.data.id);
+    }catch(e){
+      console.error("DA auth error", e);
+      scheduleReconnect();
+    }
+  }
+  function openSocket(socketToken, userId){
+    if(ws){ try{ ws.close(); }catch(e){} }
+    ws = new WebSocket("wss://centrifugo.donationalerts.com/connection/websocket");
+    let clientId = null;
+    ws.addEventListener("open", () => { ws.send(JSON.stringify({ params:{token:socketToken}, id: msgId++ })); });
+    ws.addEventListener("message", async (ev) => {
+      let data; try{ data = JSON.parse(ev.data); }catch(e){ return; }
+      if(data.result && data.result.client && !clientId){
+        clientId = data.result.client;
+        try{
+          const subResp = await fetch(daApiUrl("centrifuge/subscribe"), {
+            method:"POST", headers:{ Authorization:"Bearer "+da.accessToken, "Content-Type":"application/json" },
+            body: JSON.stringify({ channels:["$alerts:donation_"+userId], client: clientId })
+          });
+          const subJson = await subResp.json();
+          const channelToken = subJson.channels && subJson.channels[0] && subJson.channels[0].token;
+          if(!channelToken) throw new Error("no channel token");
+          ws.send(JSON.stringify({ params:{channel:"$alerts:donation_"+userId, token:channelToken}, method:1, id: msgId++ }));
+        }catch(e){ scheduleReconnect(); }
+        return;
+      }
+      if(data.result && data.result.channel){ reconnectDelay = 1000; }
+      if(data.result && data.result.data){
+        const payload = data.result.data;
+        const alert = (payload && payload.data) || (payload && payload.alert) || payload;
+        const amount = Number(alert && alert.amount);
+        if(amount && !Number.isNaN(amount)) handlePetDonation(amount, alert.message, alert.username);
+      }
+    });
+    ws.addEventListener("close", scheduleReconnect);
+    ws.addEventListener("error", () => {});
+  }
+  function scheduleReconnect(){
+    if(reconnectTimer) return;
+    reconnectTimer = setTimeout(() => {
+      reconnectTimer = null;
+      reconnectDelay = Math.min(30000, reconnectDelay*1.7);
+      connectRealtime();
+    }, reconnectDelay);
+  }
+
+  // ---------- Twitch chat (anonymous read-only IRC over WebSocket — no proxy needed) ----------
+  let twitchWs = null, twitchReconnectDelay = 2000, twitchReconnectTimer = null;
+  function connectTwitch(){
+    if(twitchWs){ try{ twitchWs.close(); }catch(e){} twitchWs = null; }
+    if(twitchReconnectTimer){ clearTimeout(twitchReconnectTimer); twitchReconnectTimer = null; }
+    const channel = (cfg.twitchChannel||"").trim().toLowerCase().replace(/^#/, "");
+    if(!channel) return;
+    twitchWs = new WebSocket("wss://irc-ws.chat.twitch.tv:443");
+    twitchWs.addEventListener("open", () => {
+      twitchWs.send("CAP REQ :twitch.tv/tags twitch.tv/commands");
+      twitchWs.send("PASS justchecking");
+      twitchWs.send("NICK justinfan" + Math.floor(10000 + Math.random()*90000));
+      twitchWs.send("JOIN #" + channel);
+      twitchReconnectDelay = 2000;
+    });
+    twitchWs.addEventListener("message", (ev) => {
+      String(ev.data).split("\r\n").filter(Boolean).forEach(handleTwitchLine);
+    });
+    twitchWs.addEventListener("close", scheduleTwitchReconnect);
+    twitchWs.addEventListener("error", () => {});
+  }
+  function scheduleTwitchReconnect(){
+    if(twitchReconnectTimer || !cfg.twitchChannel) return;
+    twitchReconnectTimer = setTimeout(() => {
+      twitchReconnectTimer = null;
+      twitchReconnectDelay = Math.min(30000, twitchReconnectDelay*1.7);
+      connectTwitch();
+    }, twitchReconnectDelay);
+  }
+  function handleTwitchLine(line){
+    if(line.startsWith("PING")){ twitchWs.send("PONG :tmi.twitch.tv"); return; }
+    let rest = line;
+    const tags = {};
+    if(rest.startsWith("@")){
+      const sp = rest.indexOf(" ");
+      rest.slice(1, sp).split(";").forEach(kv => {
+        const i = kv.indexOf("=");
+        if(i > 0) tags[kv.slice(0,i)] = kv.slice(i+1);
+      });
+      rest = rest.slice(sp+1);
+    }
+    const m = rest.match(/^:([^!]+)!\S+ PRIVMSG #\S+ :(.*)$/);
+    if(!m) return;
+    const login = m[1];
+    const text = m[2];
+    const displayName = tags["display-name"] || login;
+    if(activeCatchRound && activeCatchRound.active){
+      if(text.trim().toLowerCase() === cfg.catchCommand.trim().toLowerCase()){
+        activeCatchRound.catchers.set(login, displayName);
+      }
+    }
+  }
+
+  // ---------- init ----------
+  petCard.className = cfg.cornerPosition;
+  updatePetUI();
+  applyDecayIfDue();
+  renderSettingsForm();
+  if(isDockSettings) settingsPanel.classList.add("open");
+  connectRealtime();
+  connectTwitch();
+  fetchStats();
+})();
+</script>
+</body>
+</html>
