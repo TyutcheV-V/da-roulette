@@ -227,7 +227,7 @@
     <div id="dropLayer"></div>
   </div>
   <div id="catchBanner">🥛 Лови команду <span id="catchCmdLabel">!ловлю</span>!</div>
-  <div id="burstWarning">СОНЕЧКА ЩАС ЛОПНЕТ</div>
+  <div id="burstWarning">СОНЕЧКА СЕЙЧАС ЗАПУСТИТ МОЛОКО</div>
   <div id="catchWinnersBanner"></div>
   <div id="moodPopup">
     <img id="moodPopupImg" alt="Сонечка">
@@ -360,7 +360,7 @@
     <label>Сколько секунд трясётся с предупреждением перед заливкой</label>
     <input type="number" id="cfgFloodWarning" value="10" min="0">
     <label>Текст предупреждения</label>
-    <input type="text" id="cfgBurstText" value="СОНЕЧКА ЩАС ЛОПНЕТ">
+    <input type="text" id="cfgBurstText" value="СОНЕЧКА СЕЙЧАС ЗАПУСТИТ МОЛОКО">
 
     <h3>Случайные капризы на весь экран</h3>
     <div class="muted">Время от времени она сама выскакивает на весь экран со злым лицом и случайной фразой.</div>
@@ -454,7 +454,7 @@
       floodWarningSeconds: 10,    // держим "ЩАС ЛОПНЕТ" перед самой заливкой
       floodHoldSeconds: 6,
       floodText: "СОНЕЧКА ЗАЛИВАЕТ ВАС МОЛОЧКОМ ОТКРЫВАЙТЕ РОТИК",
-      burstWarningText: "СОНЕЧКА ЩАС ЛОПНЕТ",
+      burstWarningText: "СОНЕЧКА СЕЙЧАС ЗАПУСТИТ МОЛОКО",
       feedPhrases: "Ой как вкусно!\nСпасибо, объедение!\nМ-м-м, то что нужно!\nТеперь я сытая!",
       petPhrases: "Хи-хи-хи!\nОчень приятно!\nМне так хорошо!\nЕщё, ещё!",
       moodPopupPhrases: "Я ГОЛОДНАЯ\nМНЕ ГРУСТНО\nПОДОИ МЕНЯ Я УЖЕ НЕ МОГУ",
@@ -796,7 +796,7 @@
   cfgFloodIncrement.addEventListener("change", () => { cfg.floodThresholdIncrement = Number(cfgFloodIncrement.value)||0; saveConfig(); });
   cfgFloodText.addEventListener("change", () => { cfg.floodText = cfgFloodText.value || "СОНЕЧКА ЗАЛИВАЕТ ВАС МОЛОЧКОМ"; saveConfig(); });
   cfgFloodWarning.addEventListener("change", () => { cfg.floodWarningSeconds = Number(cfgFloodWarning.value)||0; saveConfig(); });
-  cfgBurstText.addEventListener("change", () => { cfg.burstWarningText = cfgBurstText.value || "СОНЕЧКА ЩАС ЛОПНЕТ"; saveConfig(); });
+  cfgBurstText.addEventListener("change", () => { cfg.burstWarningText = cfgBurstText.value || "СОНЕЧКА СЕЙЧАС ЗАПУСТИТ МОЛОКО"; saveConfig(); });
   cfgPopupMin.addEventListener("change", () => { cfg.randomPopupMinMinutes = Number(cfgPopupMin.value)||15; saveConfig(); scheduleNextPopup(); });
   cfgPopupMax.addEventListener("change", () => { cfg.randomPopupMaxMinutes = Number(cfgPopupMax.value)||45; saveConfig(); scheduleNextPopup(); });
   cfgPopupPhrases.addEventListener("change", () => { cfg.moodPopupPhrases = cfgPopupPhrases.value; saveConfig(); });
@@ -989,14 +989,26 @@
       const gaugeLevel = (cfg.milkGauge||0) / 100;
       const growthMult = 1 + (cfg.growth-1)*Number(cfg.milkGrowthFactor||0.5);
       const yieldAmount = Math.max(0, Math.round(Number(cfg.milkBaseYield||1) * growthMult * gaugeLevel * strength));
-      cfg.milkGauge = Math.max(0, (cfg.milkGauge||0) - Number(cfg.milkGaugeDrainPerMilk||35));
-      if(cfg.milkHappinessCost) cfg.happiness = Math.max(0, cfg.happiness - Number(cfg.milkHappinessCost));
-      if(cfg.milkFullnessCost) cfg.fullness = Math.max(0, cfg.fullness - Number(cfg.milkFullnessCost));
       postStat("donor", donorName, amount);
-      playFile("sounds/milk.mp3");
       if(yieldAmount <= 0){
-        showBubble(`Сонечка слишком устала для молока... покормите и погладьте её! 😿`);
+        // дойка пустая — донат не пропадает зря, уходит поровну на еду и ласку
+        const half = strength / 2;
+        const feedGain = Number(cfg.feedFullnessStep||20)*half;
+        const feedOverflow = Math.max(0, cfg.fullness + feedGain - 100);
+        cfg.fullness = Math.min(100, cfg.fullness + feedGain);
+        cfg.growth = cfg.growth + Number(cfg.feedGrowthStep||0.2)*half;
+        feedGauge(feedGain + feedOverflow*Number(cfg.gaugeOverflowBonus||1));
+        const petGain = Number(cfg.petHappinessStep||20)*half;
+        const petOverflow = Math.max(0, cfg.happiness + petGain - 100);
+        cfg.happiness = Math.min(100, cfg.happiness + petGain);
+        feedGauge(petGain + petOverflow*Number(cfg.gaugeOverflowBonus||1));
+        showBubble(`Молока пока нет — донат ${donorName} пошёл ей на еду и ласку! 🌾💛`);
+        playFile("sounds/feed.mp3");
       } else {
+        cfg.milkGauge = Math.max(0, (cfg.milkGauge||0) - Number(cfg.milkGaugeDrainPerMilk||35));
+        if(cfg.milkHappinessCost) cfg.happiness = Math.max(0, cfg.happiness - Number(cfg.milkHappinessCost));
+        if(cfg.milkFullnessCost) cfg.fullness = Math.max(0, cfg.fullness - Number(cfg.milkFullnessCost));
+        playFile("sounds/milk.mp3");
         cfg.milkCans += 1; // счётчик доек до заливки — считаем именно дойки, не литры
         cfg.pendingMilkYield = (cfg.pendingMilkYield||0) + yieldAmount; // копится на приз для ловли при заливке
         showBubble(`${donorName} подоил(а) Сонечку! 🥛 ${cfg.milkCans}/${cfg.floodThreshold}`);
@@ -1009,9 +1021,10 @@
 
   // вёдра набрались — сначала тревога с тряской, и только потом сама заливка
   function startBurstWarning(){
-    burstWarning.textContent = cfg.burstWarningText || "СОНЕЧКА ЩАС ЛОПНЕТ";
+    burstWarning.textContent = cfg.burstWarningText || "СОНЕЧКА СЕЙЧАС ЗАПУСТИТ МОЛОКО";
     burstWarning.classList.add("show");
     petCard.classList.add("shaking");
+    playFile("sounds/startup.mp3"); // звук предупреждения — один раз, именно тут
     setTimeout(() => {
       burstWarning.classList.remove("show");
       petCard.classList.remove("shaking");
@@ -1280,7 +1293,6 @@
   applyDecayIfDue();
   renderSettingsForm();
   if(isDockSettings) settingsPanel.classList.add("open");
-  else playFile("sounds/startup.mp3"); // звук при запуске виджета, не в режиме дока
   connectRealtime();
   connectTwitch();
   fetchStats();
