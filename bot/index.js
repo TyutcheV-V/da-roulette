@@ -58,15 +58,11 @@ client.on("message", async (channel, tags, message, self) => {
   if (self) return;
   const text = message.trim().toLowerCase();
   const login = (tags.username || "").toLowerCase();
-  // временный диагностический лог — покажет в Render Logs всё, что реально
-  // приходит от Twitch, и с чем оно сравнивается
-  console.log("msg:", JSON.stringify(text), "from:", login, "matchesCatch:", text === CATCH_COMMAND, "catchCmd:", JSON.stringify(CATCH_COMMAND));
   if (!login) return;
 
   if (text === CATCH_COMMAND) {
     try {
       const result = await reportCatch(login);
-      console.log("catch result:", JSON.stringify(result)); // временно, для диагностики
       // намеренно молчим в чате на каждую дойку — иначе чат зафлудит при
       // дойке в 10 литров за несколько секунд; результат виден на экране
       if (!result.ok) console.warn("catch api error", result);
@@ -79,12 +75,8 @@ client.on("message", async (channel, tags, message, self) => {
   if (text === BALANCE_COMMAND) {
     try {
       const result = await getBalance(login);
-      console.log("balance result:", JSON.stringify(result)); // временно, для диагностики
       const displayName = tags["display-name"] || tags.username;
-      const reply = `@${displayName}, у тебя ${formatLiters(result.liters)} л молочка 🥛`;
-      client.say(channel, reply)
-        .then((r) => console.log("say ok:", JSON.stringify(r)))
-        .catch((e) => console.error("say failed:", e));
+      await client.say(channel, `@${displayName}, у тебя ${formatLiters(result.liters)} л молочка 🥛`);
     } catch (e) {
       console.error("balance request failed", e);
     }
