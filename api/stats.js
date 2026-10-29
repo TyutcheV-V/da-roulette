@@ -22,9 +22,8 @@ function pairUp(arr) {
   return out;
 }
 
-// Vercel's automatic req.body JSON parsing mangles non-ASCII text (Cyrillic
-// names came back as U+FFFD replacement characters) — read and parse the
-// raw body ourselves instead of trusting req.body.
+// Vercel's automatic req.body JSON parsing can mangle non-ASCII text — read
+// and parse the raw request body ourselves instead of trusting req.body.
 function readRawBody(req) {
   return new Promise((resolve, reject) => {
     const chunks = [];
@@ -37,7 +36,7 @@ function readRawBody(req) {
 module.exports = async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
-  res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+  res.setHeader("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS");
   if (req.method === "OPTIONS") { res.status(204).end(); return; }
 
   if (!KV_URL || !KV_TOKEN) {
@@ -46,11 +45,6 @@ module.exports = async function handler(req, res) {
   }
 
   try {
-    if (req.method === "GET" && req.query.debug === "1") {
-      const raw = await redis("ZREVRANGE", "sonechka:donors", 0, 19, "WITHSCORES");
-      res.status(200).json({ raw, charCodes: raw.map(s => typeof s === "string" ? Array.from(s).map(c=>c.charCodeAt(0)) : s) });
-      return;
-    }
     if (req.method === "GET") {
       const [donors, drinkers] = await Promise.all([
         redis("ZREVRANGE", "sonechka:donors", 0, 19, "WITHSCORES"),
@@ -61,16 +55,6 @@ module.exports = async function handler(req, res) {
     }
     if (req.method === "POST") {
       const rawBuf = await readRawBody(req);
-      if (req.query.debug === "1") {
-        res.status(200).json({
-          rawHex: rawBuf.toString("hex"),
-          rawAsUtf8: rawBuf.toString("utf-8"),
-          headerContentType: req.headers["content-type"],
-          headerContentLength: req.headers["content-length"],
-          actualByteLength: rawBuf.length,
-        });
-        return;
-      }
       const body = rawBuf.length ? JSON.parse(rawBuf.toString("utf-8")) : {};
       const { type, name, amount } = body || {};
       if (!name || !amount || (type !== "donor" && type !== "drinker")) {
@@ -78,13 +62,20 @@ module.exports = async function handler(req, res) {
         return;
       }
       const key = type === "donor" ? "sonechka:donors" : "sonechka:drinkers";
-      const cleanName = String(name).slice(0, 64);
-      const zincrResult = await redis("ZINCRBY", key, Number(amount), cleanName);
-      res.status(200).json({
-        ok: true,
-        debugNameSentCharCodes: Array.from(cleanName).map(c=>c.charCodeAt(0)),
-        debugZincrResult: zincrResult,
-      });
+      await redis("ZINCRBY", key, Number(amount), String(name).slice(0, 64));
+      res.status(200).json({ ok: true });
+      return;
+    }
+    // DELETE ?key=donors|drinkers&member=<name> removes one entry; with no
+    // member, clears the whole leaderboard. Used to wipe test data.
+    if (req.method === "DELETE") {
+      const which = req.query.key === "drinkers" ? "sonechka:drinkers" : "sonechka:donors";
+      if (req.query.member) {
+        await redis("ZREM", which, req.query.member);
+      } else {
+        await redis("DEL", which);
+      }
+      res.status(200).json({ ok: true });
       return;
     }
     res.status(405).end();
