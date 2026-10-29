@@ -902,10 +902,23 @@
   }
 
   let bubbleTimer = null;
+  // карточка часто стоит у самого края экрана — центрированный пузырь над ней
+  // может вылезти за пределы кадра, поэтому после показа подвигаем его обратно внутрь
+  function clampBubbleToStage(el){
+    el.style.marginLeft = ""; // сбрасываем перед замером, иначе старый сдвиг искажает расчёт
+    const stageRect = document.getElementById("stage").getBoundingClientRect();
+    const rect = el.getBoundingClientRect();
+    let shift = 0;
+    if(rect.right > stageRect.right - 6) shift = (stageRect.right - 6) - rect.right;
+    else if(rect.left < stageRect.left + 6) shift = (stageRect.left + 6) - rect.left;
+    if(shift) el.style.marginLeft = `${shift}px`;
+  }
+
   function showBubble(text){
     hintBubble.classList.remove("show"); // не перекрываем реальное сообщение подсказкой
     petBubble.textContent = text;
     petBubble.classList.add("show");
+    clampBubbleToStage(petBubble);
     clearTimeout(bubbleTimer);
     bubbleTimer = setTimeout(() => petBubble.classList.remove("show"), 4500);
   }
@@ -1158,6 +1171,7 @@
     hintIdx = (hintIdx + 1) % hints.length;
     hintBubble.textContent = hints[hintIdx];
     hintBubble.classList.add("show");
+    clampBubbleToStage(hintBubble);
     setTimeout(() => hintBubble.classList.remove("show"), Math.max(3000, (cfg.hintRotationSeconds||25)*1000 - 2000));
   }
 
