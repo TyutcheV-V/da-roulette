@@ -37,13 +37,19 @@
   #petCard{
     position:absolute; left:88%; top:85%; transform:translate(-50%,-50%);
     width:190px; height:253px; text-align:center;
-    background:var(--card-navy-dark); border:1px solid var(--card-border); border-radius:18px;
-    box-shadow:0 8px 26px rgba(0,0,0,.55);
-    touch-action:none; overflow:hidden;
-    animation: petGlow 3.4s ease-in-out infinite;
+    touch-action:none;
   }
   #petCard.arrangeMode{
     cursor:move; outline:2px dashed #ff6a3d; outline-offset:4px;
+  }
+  /* сама видимая карточка (фон/рамка/скругление/обрезка) — отдельно от
+     #petCard, который только позиционируется/перетаскивается, чтобы шкала
+     молока и шапка с именем могли торчать за её пределы не обрезаясь */
+  #petCardInner{
+    position:absolute; inset:0; overflow:hidden; border-radius:18px;
+    background:var(--card-navy-dark); border:1px solid var(--card-border);
+    box-shadow:0 8px 26px rgba(0,0,0,.55);
+    animation: petGlow 3.4s ease-in-out infinite;
   }
   /* непрерывное мягкое "дыхание" подсветки по краю — чтобы карточка не
      выглядела статичной заставкой, а постоянно чуть "жила". Намеренно только
@@ -78,18 +84,36 @@
   }
   @keyframes heartFloat{ 0%,100%{ transform:translateY(0) scale(1); opacity:.85; } 50%{ transform:translateY(-6px) scale(1.12); opacity:1; } }
 
-  /* small badge, top-left — bucket progress toward the next flood */
-  #petMilkBadge{
-    position:absolute; left:10px; top:10px; z-index:2;
-    background:rgba(10,14,26,.72); border:1px solid var(--card-border); border-radius:10px;
-    padding:3px 8px; font-size:11px; font-weight:700; color:#bfe0ff;
+  /* шапка с именем — поверх верхнего края карточки, как брелок-бейдж;
+     не обрезается (сидит на #petCard, а не на #petCardInner) */
+  #petNameHeader{
+    position:absolute; left:50%; top:-14px; transform:translateX(-50%); z-index:3; cursor:pointer;
+    display:flex; align-items:center; gap:6px;
+    font-weight:800; font-size:12px; letter-spacing:.05em; text-transform:uppercase; color:#fff;
+    background:rgba(20,10,30,.88); border:1.5px solid #ff6fb5; border-radius:14px; padding:4px 14px;
+    box-shadow:0 0 14px rgba(255,111,181,.55);
+    white-space:nowrap;
   }
+  .petHeaderHeart{ font-size:11px; }
 
-  #petName{
-    position:absolute; right:10px; top:10px; z-index:2; cursor:pointer;
-    font-weight:800; font-size:11px; letter-spacing:.03em; text-transform:uppercase;
-    background:rgba(10,14,26,.6); border-radius:10px; padding:3px 9px; color:#fff;
+  /* внешняя шкала молока — отдельно от карточки, справа от неё */
+  #milkTubeWrap{
+    position:absolute; left:100%; top:0; margin-left:12px; height:100%; z-index:2;
+    display:flex; flex-direction:column; align-items:center; gap:8px;
   }
+  #milkTube{
+    width:16px; flex:1 1 auto; border-radius:10px;
+    background:rgba(140,210,255,.12); border:1px solid rgba(180,225,255,.5);
+    box-shadow:inset 0 0 6px rgba(255,255,255,.15);
+    overflow:hidden; display:flex; flex-direction:column; justify-content:flex-end;
+  }
+  #milkTubeFill{
+    width:100%; height:0%; border-radius:9px 9px 0 0;
+    background:linear-gradient(180deg,#9fe0ff,#2e9eff);
+    box-shadow:0 0 10px rgba(80,180,255,.6);
+    transition:height .6s ease;
+  }
+  #milkBucketIcon{ font-size:22px; filter:drop-shadow(0 1px 3px rgba(0,0,0,.5)); flex:0 0 auto; }
 
   /* bottom overlay: gradient scrim + three stat pairs (icon over percentage) */
   #petStatsOverlay{
@@ -99,8 +123,8 @@
   }
   /* position:relative тут ради .gainPopup (всплывающая "+N") — он якорится на эту строку */
   .petStatItem{ position:relative; flex:1; display:flex; flex-direction:column; align-items:center; gap:2px; }
-  .petStatIcon{ width:32px; height:32px; object-fit:contain; filter:drop-shadow(0 1px 4px rgba(0,0,0,.5)); }
-  .petStatPct{ font-size:12px; font-weight:800; color:#fff; text-shadow:0 1px 3px rgba(0,0,0,.6); }
+  .petStatIcon{ width:46px; height:46px; object-fit:contain; filter:drop-shadow(0 1px 4px rgba(0,0,0,.5)); }
+  .petStatPct{ font-size:13px; font-weight:800; color:#fff; text-shadow:0 1px 3px rgba(0,0,0,.6); }
 
   /* когда показатель критически низкий — пульсирует иконка, чтобы было
      заметно даже краем глаза (как иконка здоровья в играх) */
@@ -303,20 +327,24 @@
   </div>
 
   <div id="petCard">
-    <div id="petSpriteWrap">
-      <img id="petSpriteImg" alt="Сонечка">
-      <div id="petSpriteFallback">🐐</div>
+    <div id="petCardInner">
+      <div id="petSpriteWrap">
+        <img id="petSpriteImg" alt="Сонечка">
+        <div id="petSpriteFallback">🐐</div>
+      </div>
+      <div class="petHeartDeco" style="left:14%; top:14%;">💗</div>
+      <div class="petHeartDeco" style="left:78%; top:22%; animation-delay:.6s;">💞</div>
+      <div id="petBubble"></div>
+      <div id="hintBubble"></div>
+      <div id="petStatsOverlay">
+        <div class="petStatItem" id="petHappyBar"><img id="happyLabel" class="petStatIcon" alt="счастье"><span id="happyPct" class="petStatPct">70%</span></div>
+        <div class="petStatItem" id="petFullBar"><img id="fullLabel" class="petStatIcon" alt="сытость"><span id="fullPct" class="petStatPct">70%</span></div>
+      </div>
     </div>
-    <div class="petHeartDeco" style="left:14%; top:14%;">💗</div>
-    <div class="petHeartDeco" style="left:78%; top:22%; animation-delay:.6s;">💞</div>
-    <div id="petBubble"></div>
-    <div id="hintBubble"></div>
-    <div id="petMilkBadge">🥛 0/10</div>
-    <div id="petName">Сонечка</div>
-    <div id="petStatsOverlay">
-      <div class="petStatItem" id="petHappyBar"><img id="happyLabel" class="petStatIcon" alt="счастье"><span id="happyPct" class="petStatPct">70%</span></div>
-      <div class="petStatItem" id="petFullBar"><img id="fullLabel" class="petStatIcon" alt="сытость"><span id="fullPct" class="petStatPct">70%</span></div>
-      <div class="petStatItem" id="petGaugeBar"><img id="gaugeLabel" class="petStatIcon" alt="молоко"><span id="gaugePct" class="petStatPct">0%</span></div>
+    <div id="petNameHeader"><span class="petHeaderHeart">💗</span>Сонечка<span class="petHeaderHeart">💗</span></div>
+    <div id="milkTubeWrap">
+      <div id="milkTube"><div id="milkTubeFill"></div></div>
+      <div id="milkBucketIcon">🥛</div>
     </div>
   </div>
 
@@ -672,14 +700,12 @@
   const petSpriteFallback = document.getElementById("petSpriteFallback");
   const petHappyBar = document.getElementById("petHappyBar");
   const petFullBar = document.getElementById("petFullBar");
-  const petGaugeBar = document.getElementById("petGaugeBar");
   const happyLabel = document.getElementById("happyLabel");
   const fullLabel = document.getElementById("fullLabel");
-  const gaugeLabel = document.getElementById("gaugeLabel");
   const happyPctEl = document.getElementById("happyPct");
   const fullPctEl = document.getElementById("fullPct");
-  const gaugePctEl = document.getElementById("gaugePct");
-  const petMilkBadge = document.getElementById("petMilkBadge");
+  const milkTubeWrap = document.getElementById("milkTubeWrap");
+  const milkTubeFill = document.getElementById("milkTubeFill");
   const petBubble = document.getElementById("petBubble");
   const hintBubble = document.getElementById("hintBubble");
   const dropLayer = document.getElementById("dropLayer");
@@ -693,7 +719,7 @@
 
   const secretCorner = document.getElementById("secretCorner");
   const gearBtn = document.getElementById("gearBtn");
-  const petNameEl = document.getElementById("petName");
+  const petNameEl = document.getElementById("petNameHeader");
   const settingsPanel = document.getElementById("settingsPanel");
 
   const cfgClientId = document.getElementById("cfgClientId");
@@ -1126,18 +1152,16 @@
     const gaugePct = Math.max(0,Math.min(100,cfg.milkGauge||0));
     setStatIcon(happyLabel, "serdce", happyPct);
     setStatIcon(fullLabel, "korm", fullPct);
-    setStatIcon(gaugeLabel, "moloko", gaugePct);
+    milkTubeFill.style.height = gaugePct + "%";
     happyPctEl.textContent = Math.round(happyPct) + "%";
     fullPctEl.textContent = Math.round(fullPct) + "%";
-    gaugePctEl.textContent = Math.round(gaugePct) + "%";
-    petMilkBadge.textContent = `🥛 ${Math.floor(cfg.milkCans)}/${cfg.floodThreshold}`;
     happyLabel.classList.toggle("critical", happyPct < CRITICAL_STAT_THRESHOLD);
     fullLabel.classList.toggle("critical", fullPct < CRITICAL_STAT_THRESHOLD);
   }
 
   // всплывающая "+N" над нужной полоской — быстрая игровая обратная связь на донат
   function popupNear(barEl, text){
-    const row = barEl.closest(".petStatItem");
+    const row = barEl.closest(".petStatItem") || barEl; // шкала молока снаружи карточки — не .petStatItem, якорим прямо на неё
     if(!row) return;
     const el = document.createElement("div");
     el.className = "gainPopup";
@@ -1358,7 +1382,7 @@
       cfg.milkGauge = (cfg.milkGauge||0) + gaugeFill;
       cfg.happiness = Math.max(0, cfg.happiness - Number(cfg.milkHappinessCost||0)*strength);
       cfg.fullness = Math.max(0, cfg.fullness - Number(cfg.milkFullnessCost||0)*strength);
-      popupNear(petGaugeBar, "+" + Math.round(gaugeFill));
+      popupNear(milkTubeWrap, "+" + Math.round(gaugeFill));
       postStat("donor", donorName, amount);
       // кешбек на баланс молочка (!молочко/!просьба) за сам факт доната на дойку —
       // линейно от minAmount до maxAmount, независимо от шкалы/бидонов выше
