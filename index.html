@@ -195,7 +195,11 @@
   body.dockMode{ background:#101018; }
   body.dockMode #stage > *:not(#settingsPanel){ display:none !important; }
   body.dockMode .progressOnlySection, body.dockMode .rouletteOnlySection{ display:block !important; }
-  body.dockMode{ overflow-y:auto !important; overflow-x:hidden; }
+  body.dockMode{ overflow-y:scroll !important; overflow-x:hidden; }
+  body.dockMode::-webkit-scrollbar{ width:16px; }
+  body.dockMode::-webkit-scrollbar-track{ background:#1b1b22; }
+  body.dockMode::-webkit-scrollbar-thumb{ background:#555; border-radius:8px; border:3px solid #1b1b22; }
+  body.dockMode::-webkit-scrollbar-thumb:hover{ background:#7c4dff; }
   body.dockMode #settingsPanel{
     position:static; display:block; width:100%; max-width:none; height:auto;
     min-height:100vh; max-height:none; border-radius:0; box-shadow:none;
@@ -505,6 +509,12 @@
   document.body.classList.toggle("editMode", editMode);
   document.body.classList.toggle("noRoulette", !hasRouletteUI);
   document.body.classList.toggle("dockMode", isDockSettings);
+  if(isDockSettings){
+    document.documentElement.style.overflowY = "scroll";
+    document.documentElement.style.overflowX = "hidden";
+    document.body.style.overflowY = "scroll";
+    document.body.style.overflowX = "hidden";
+  }
 
   // ---------- cross-document sync (localStorage is shared between OBS browser sources of the same origin) ----------
   const watchers = {};

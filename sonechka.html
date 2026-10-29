@@ -20,7 +20,11 @@
   #stage{ position:relative; width:100%; height:100%; }
   body.dockMode{ background:#101018; }
   body.dockMode #stage > *:not(#settingsPanel){ display:none !important; }
-  body.dockMode{ overflow-y:auto !important; overflow-x:hidden; }
+  body.dockMode{ overflow-y:scroll !important; overflow-x:hidden; }
+  body.dockMode::-webkit-scrollbar{ width:16px; }
+  body.dockMode::-webkit-scrollbar-track{ background:#1b1b22; }
+  body.dockMode::-webkit-scrollbar-thumb{ background:#555; border-radius:8px; border:3px solid #1b1b22; }
+  body.dockMode::-webkit-scrollbar-thumb:hover{ background:#7c4dff; }
   body.dockMode #settingsPanel{
     position:static; display:block; width:100%; max-width:none; height:auto;
     min-height:100vh; max-height:none; border-radius:0; box-shadow:none; box-sizing:border-box;
@@ -427,6 +431,14 @@
 
   document.body.classList.toggle("editMode", editMode);
   document.body.classList.toggle("dockMode", isDockSettings);
+  if(isDockSettings){
+    // belt and braces: override inline, in case some OBS dock builds don't
+    // pick up the body.dockMode CSS cascade for the <html> element's own scroll
+    document.documentElement.style.overflowY = "scroll";
+    document.documentElement.style.overflowX = "hidden";
+    document.body.style.overflowY = "scroll";
+    document.body.style.overflowX = "hidden";
+  }
 
   // ---------- settings open/close ----------
   function toggleSettingsPanel(){
