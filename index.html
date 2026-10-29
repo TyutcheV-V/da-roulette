@@ -1132,7 +1132,9 @@
       if(data.result && data.result.channel){
         setStatus("ok");
         reconnectDelay = 1000;
-        return;
+        // don't return here — a real donation push carries both
+        // `channel` and `data` on the same message, so it must still
+        // fall through to the donation check below
       }
 
       if(data.result && data.result.data){
