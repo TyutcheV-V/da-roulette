@@ -173,6 +173,21 @@ module.exports = async function handler(req, res) {
         return;
       }
 
+      // ручная правка баланса (например, компенсация ошибочного списания) —
+      // не вызывается ботом в обычной работе, только для ручных исправлений
+      if (action === "adjust") {
+        if (!CATCH_SECRET || req.headers["x-bot-secret"] !== CATCH_SECRET) {
+          res.status(401).json({ error: "unauthorized" });
+          return;
+        }
+        const user = String(body.user || "").toLowerCase().trim();
+        const delta = Number(body.delta);
+        if (!user || !delta) { res.status(400).json({ error: "missing user or delta" }); return; }
+        const balance = await redis("ZINCRBY", BALANCE_KEY, delta, user);
+        res.status(200).json({ ok: true, balance: Number(balance) });
+        return;
+      }
+
       res.status(400).json({ error: "unknown action" });
       return;
     }
