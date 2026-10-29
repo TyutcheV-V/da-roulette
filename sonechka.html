@@ -389,6 +389,8 @@
     </div>
     <label>Насколько растёт порог после каждой заливки (10 → 11 → 12...)</label>
     <input type="number" id="cfgFloodIncrement" value="1" min="0">
+    <label>Насколько растёт счастье после заливки (ей полегчало)</label>
+    <input type="number" id="cfgFloodHappinessBoost" value="30" min="0" max="100">
     <label>Текст на весь экран при заливке</label>
     <input type="text" id="cfgFloodText" value="СОНЕЧКА ЗАЛИВАЕТ ВАС МОЛОЧКОМ ОТКРЫВАЙТЕ РОТИК">
     <label>Сколько секунд трясётся с предупреждением перед заливкой</label>
@@ -526,6 +528,7 @@
       overflowSlowFactor: 0.4,   // во время замедления падение идёт с этой долей скорости (0.4 = на 60% медленнее)
       floodThreshold: 10,
       floodThresholdIncrement: 1, // 10 -> 11 -> 12 ... after each flood
+      floodHappinessBoost: 30,  // после заливки ей полегчало — счастье подскакивает
       floodWarningSeconds: 10,    // держим "ЩАС ЛОПНЕТ" перед самой заливкой
       floodHoldSeconds: 6,
       floodText: "СОНЕЧКА ЗАЛИВАЕТ ВАС МОЛОЧКОМ ОТКРЫВАЙТЕ РОТИК",
@@ -661,6 +664,7 @@
   const cfgFeedPhrases = document.getElementById("cfgFeedPhrases");
   const cfgPetPhrases = document.getElementById("cfgPetPhrases");
   const cfgFloodThreshold = document.getElementById("cfgFloodThreshold");
+  const cfgFloodHappinessBoost = document.getElementById("cfgFloodHappinessBoost");
   const cfgFloodIncrement = document.getElementById("cfgFloodIncrement");
   const cfgFloodHold = document.getElementById("cfgFloodHold");
   const cfgFloodText = document.getElementById("cfgFloodText");
@@ -755,6 +759,7 @@
     cfgFeedPhrases.value = cfg.feedPhrases;
     cfgPetPhrases.value = cfg.petPhrases;
     cfgFloodThreshold.value = cfg.floodThreshold;
+    cfgFloodHappinessBoost.value = cfg.floodHappinessBoost;
     cfgFloodHold.value = cfg.floodHoldSeconds;
     cfgFloodIncrement.value = cfg.floodThresholdIncrement;
     cfgFloodText.value = cfg.floodText;
@@ -913,6 +918,7 @@
   cfgFloodThreshold.addEventListener("change", () => { cfg.floodThreshold = Number(cfgFloodThreshold.value)||10; saveConfig(); updatePetUI(); });
   cfgFloodHold.addEventListener("change", () => { cfg.floodHoldSeconds = Number(cfgFloodHold.value)||6; saveConfig(); });
   cfgFloodIncrement.addEventListener("change", () => { cfg.floodThresholdIncrement = Number(cfgFloodIncrement.value)||0; saveConfig(); });
+  cfgFloodHappinessBoost.addEventListener("change", () => { cfg.floodHappinessBoost = Number(cfgFloodHappinessBoost.value)||0; saveConfig(); });
   cfgFloodText.addEventListener("change", () => { cfg.floodText = cfgFloodText.value || "СОНЕЧКА ЗАЛИВАЕТ ВАС МОЛОЧКОМ"; saveConfig(); });
   cfgFloodWarning.addEventListener("change", () => { cfg.floodWarningSeconds = Number(cfgFloodWarning.value)||0; saveConfig(); });
   cfgBurstText.addEventListener("change", () => { cfg.burstWarningText = cfgBurstText.value || "СОНЕЧКА СЕЙЧАС ЗАПУСТИТ МОЛОКО"; saveConfig(); });
@@ -1282,6 +1288,11 @@
   function triggerFlood(){
     cfg.milkCans = 0;
     cfg.floodThreshold = cfg.floodThreshold + Number(cfg.floodThresholdIncrement||1); // 10 -> 11 -> 12 ...
+    const happinessGain = Number(cfg.floodHappinessBoost||0);
+    if(happinessGain > 0){
+      cfg.happiness = Math.min(100, cfg.happiness + happinessGain); // полегчало — выплеснула молоко
+      popupNear(petHappyBar, "+" + happinessGain);
+    }
     saveConfig();
     const holdMs = (cfg.floodHoldSeconds||6)*1000;
     floodText.textContent = cfg.floodText;
