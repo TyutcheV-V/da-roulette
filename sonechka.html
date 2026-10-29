@@ -74,7 +74,7 @@
      cover даёт нулевой запас по вертикали на этих почти квадратных картинках
      (660x864), поэтому зумим чуть сильнее самого cover и прижимаем к верху,
      остальное обрезается overflow:hidden у #petCard */
-  #petSpriteImg{ width:100%; height:100%; object-fit:cover; object-position:center top; transform:scale(1.2); transform-origin:50% 0%; display:none; }
+  #petSpriteImg{ width:100%; height:100%; object-fit:cover; object-position:center top; transform-origin:50% 0%; transition:transform .6s ease; display:none; }
   #petSpriteFallback{ font-size:56px; line-height:1; }
 
   /* decorative floating hearts, purely visual */
@@ -96,24 +96,25 @@
   }
   .petHeaderHeart{ font-size:11px; }
 
-  /* внешняя шкала молока — отдельно от карточки, справа от неё */
+  /* внешняя шкала молока — отдельно от карточки, впритык к её правому краю */
   #milkTubeWrap{
-    position:absolute; left:100%; top:0; margin-left:12px; height:100%; z-index:2;
-    display:flex; flex-direction:column; align-items:center; gap:8px;
+    position:absolute; left:100%; top:0; margin-left:4px; height:100%; z-index:2;
+    display:flex; flex-direction:column; align-items:center;
   }
   #milkTube{
-    width:16px; flex:1 1 auto; border-radius:10px;
-    background:rgba(140,210,255,.12); border:1px solid rgba(180,225,255,.5);
-    box-shadow:inset 0 0 6px rgba(255,255,255,.15);
+    width:18px; flex:1 1 auto; border-radius:10px;
+    background:rgba(40,70,100,.55); border:2px solid rgba(190,230,255,.9);
+    box-shadow:inset 0 0 6px rgba(255,255,255,.25), 0 0 8px rgba(120,200,255,.35);
     overflow:hidden; display:flex; flex-direction:column; justify-content:flex-end;
   }
   #milkTubeFill{
-    width:100%; height:0%; border-radius:9px 9px 0 0;
-    background:linear-gradient(180deg,#9fe0ff,#2e9eff);
-    box-shadow:0 0 10px rgba(80,180,255,.6);
+    width:100%; height:0%; border-radius:8px 8px 0 0;
+    background:linear-gradient(180deg,#bfeeff,#2e9eff);
+    box-shadow:0 0 10px rgba(80,180,255,.8);
     transition:height .6s ease;
   }
-  #milkBucketIcon{ font-size:22px; filter:drop-shadow(0 1px 3px rgba(0,0,0,.5)); flex:0 0 auto; }
+  /* бутылка слегка наезжает на низ шкалы, как будто шкала — это горлышко бутылки */
+  #milkBucketIcon{ width:34px; height:auto; margin-top:-10px; z-index:1; filter:drop-shadow(0 2px 4px rgba(0,0,0,.5)); flex:0 0 auto; }
 
   /* bottom overlay: gradient scrim + three stat pairs (icon over percentage) */
   #petStatsOverlay{
@@ -344,7 +345,7 @@
     <div id="petNameHeader"><span class="petHeaderHeart">💗</span>Сонечка<span class="petHeaderHeart">💗</span></div>
     <div id="milkTubeWrap">
       <div id="milkTube"><div id="milkTubeFill"></div></div>
-      <div id="milkBucketIcon">🥛</div>
+      <img id="milkBucketIcon" src="images/icons/moloko_100.png" alt="бутылка молока">
     </div>
   </div>
 
@@ -1145,11 +1146,20 @@
   function setStatIcon(imgEl, prefix, pct){
     imgEl.src = `images/icons/${prefix}_${iconTier(pct)}.png`;
   }
+  // грустная/голодная — лицо крупным планом; чем счастливее и сытее, тем
+  // больше её видно, максимум — нынешний кроп (чуть ниже половины)
+  const SPRITE_ZOOM_MAX = 2.2, SPRITE_ZOOM_MIN = 1.2;
+  function updateSpriteZoom(happyPct, fullPct){
+    const wellbeing = (happyPct + fullPct) / 2; // 0..100
+    const zoom = SPRITE_ZOOM_MAX - (wellbeing/100) * (SPRITE_ZOOM_MAX - SPRITE_ZOOM_MIN);
+    petSpriteImg.style.transform = `scale(${zoom.toFixed(3)})`;
+  }
   function updatePetUI(){
     updateSprite();
     const happyPct = Math.max(0,Math.min(100,cfg.happiness));
     const fullPct = Math.max(0,Math.min(100,cfg.fullness));
     const gaugePct = Math.max(0,Math.min(100,cfg.milkGauge||0));
+    updateSpriteZoom(happyPct, fullPct);
     setStatIcon(happyLabel, "serdce", happyPct);
     setStatIcon(fullLabel, "korm", fullPct);
     milkTubeFill.style.height = gaugePct + "%";
