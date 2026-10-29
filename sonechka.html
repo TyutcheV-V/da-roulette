@@ -81,7 +81,7 @@
   /* ---------- speech bubble (now a child of #petCard, so it follows it when dragged) ---------- */
   #petBubble{
     position:absolute; left:50%; bottom:100%; transform:translateX(-50%) translateY(6px);
-    width:220px; margin-bottom:10px; padding:8px 12px; border-radius:12px;
+    width:216px; box-sizing:border-box; margin-bottom:10px; padding:8px 12px; border-radius:12px;
     background:rgba(18,26,44,.95); border:1px solid var(--card-border); font-size:13px; font-weight:600;
     text-align:center; opacity:0; pointer-events:none; transition:opacity .3s ease, transform .3s ease;
   }
@@ -162,7 +162,7 @@
   /* idle hint bubble above the card, cycling through tips */
   #hintBubble{
     position:absolute; left:50%; transform:translateX(-50%) translateY(6px); bottom:100%; margin-bottom:10px;
-    width:240px; padding:8px 12px; border-radius:12px; background:rgba(40,26,10,.95); border:1px solid #7a5a2a;
+    width:216px; box-sizing:border-box; padding:8px 12px; border-radius:12px; background:rgba(40,26,10,.95); border:1px solid #7a5a2a;
     font-size:12px; font-weight:600; text-align:center; color:#ffe6b0;
     opacity:0; pointer-events:none; transition:opacity .4s ease, transform .4s ease;
   }
@@ -293,8 +293,8 @@
     </div>
 
     <h3>Звук</h3>
-    <label><input type="checkbox" id="cfgMuteSound" style="width:auto;"> выключить звук</label>
-    <label>Громкость</label>
+    <button id="muteToggleBtn" class="primary" style="width:100%;">🔊 Выключить звук</button>
+    <label style="margin-top:8px;">Громкость</label>
     <input type="range" id="cfgSoundVolume" min="0" max="100" value="80">
 
     <h3>Действия по донату</h3>
@@ -550,7 +550,7 @@
   const arrangeHint = document.getElementById("arrangeHint");
   const cfgPosX = document.getElementById("cfgPosX");
   const cfgPosY = document.getElementById("cfgPosY");
-  const cfgMuteSound = document.getElementById("cfgMuteSound");
+  const muteToggleBtn = document.getElementById("muteToggleBtn");
   const cfgSoundVolume = document.getElementById("cfgSoundVolume");
 
   const actionsGrid = document.getElementById("actionsGrid");
@@ -638,7 +638,7 @@
     cfgStrengthCap.value = cfg.strengthCap;
     cfgPosX.value = Math.round(cfg.posX);
     cfgPosY.value = Math.round(cfg.posY);
-    cfgMuteSound.checked = !!cfg.muteSound;
+    updateMuteBtn();
     cfgSoundVolume.value = cfg.soundVolume;
     cfgFeedFullness.value = cfg.feedFullnessStep;
     cfgFeedGrowth.value = cfg.feedGrowthStep;
@@ -776,7 +776,14 @@
     saveConfig();
     cfgPosX.value = Math.round(cfg.posX); cfgPosY.value = Math.round(cfg.posY);
   });
-  cfgMuteSound.addEventListener("change", () => { cfg.muteSound = cfgMuteSound.checked; saveConfig(); });
+  function updateMuteBtn(){
+    muteToggleBtn.textContent = cfg.muteSound ? "🔇 Включить звук" : "🔊 Выключить звук";
+  }
+  muteToggleBtn.addEventListener("click", () => {
+    cfg.muteSound = !cfg.muteSound;
+    saveConfig();
+    updateMuteBtn();
+  });
   cfgSoundVolume.addEventListener("input", () => { cfg.soundVolume = Number(cfgSoundVolume.value)||0; saveConfig(); });
   cfgFeedFullness.addEventListener("change", () => { cfg.feedFullnessStep = Number(cfgFeedFullness.value)||20; saveConfig(); });
   cfgFeedGrowth.addEventListener("change", () => { cfg.feedGrowthStep = Number(cfgFeedGrowth.value)||0.2; saveConfig(); });
