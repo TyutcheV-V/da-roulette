@@ -46,28 +46,20 @@
     cursor:move; outline:2px dashed #ff6a3d; outline-offset:4px;
   }
   /* непрерывное мягкое "дыхание" подсветки по краю — чтобы карточка не
-     выглядела статичной заставкой, а постоянно чуть "жила" */
+     выглядела статичной заставкой, а постоянно чуть "жила". Намеренно только
+     интенсивность свечения (box-shadow), без движения/сдвига — если рендер
+     источника в OBS на миг подвиснет и анимация "застынет" на случайном
+     кадре, это всё равно будет выглядеть как обычное статичное свечение,
+     а не как сломанный/зависший эффект (в отличие от бегущего блика,
+     который на паузе может застыть видимой белой полосой поперёк карточки —
+     поэтому от него намеренно отказались)
+  */
   @keyframes petGlow{
     0%,100%{ box-shadow:0 8px 26px rgba(0,0,0,.55), 0 0 0 rgba(124,77,255,0); }
-    50%{ box-shadow:0 8px 26px rgba(0,0,0,.55), 0 0 18px rgba(124,77,255,.55); }
-  }
-  /* редкий "блик", пробегающий по карточке — как подсветка лута/ивента в играх,
-     чтобы периодически цеплять взгляд, не отвлекая постоянно. Позиционируется
-     как обычный абсолютный слой под содержимым — остальные элементы карточки
-     ниже получают position:relative, чтобы гарантированно рисоваться поверх */
-  #petCard::before{
-    content:""; position:absolute; inset:0; border-radius:14px; pointer-events:none;
-    background:linear-gradient(115deg, transparent 0%, transparent 42%, rgba(255,255,255,.35) 50%, transparent 58%, transparent 100%);
-    background-size:300% 100%; background-position:200% 0;
-    animation: petShine 9s ease-in-out infinite;
-  }
-  @keyframes petShine{
-    0%, 75%{ background-position:200% 0; }
-    88%, 100%{ background-position:-40% 0; }
+    50%{ box-shadow:0 8px 26px rgba(0,0,0,.55), 0 0 22px rgba(124,77,255,.65); }
   }
 
   #petSpriteWrap{
-    position:relative; /* поверх блика карточки (petShine), не под ним */
     width:120px; height:120px; margin:0 auto 6px; border-radius:50%;
     background:var(--card-navy-light); display:flex; align-items:center; justify-content:center;
     overflow:hidden; border:2px solid var(--card-border);
@@ -75,8 +67,9 @@
   #petSpriteImg{ width:100%; height:100%; object-fit:cover; display:none; }
   #petSpriteFallback{ font-size:56px; line-height:1; }
 
-  #petName{ position:relative; font-weight:800; font-size:14px; letter-spacing:.03em; margin-bottom:6px; text-transform:uppercase; }
+  #petName{ font-weight:800; font-size:14px; letter-spacing:.03em; margin-bottom:6px; text-transform:uppercase; }
 
+  /* position:relative тут ради .gainPopup (всплывающая "+N") — он якорится на эту строку */
   .petBarRow{ position:relative; display:flex; align-items:center; gap:6px; margin-bottom:4px; }
   .petBarLabel{ font-size:13px; width:16px; text-align:center; flex:0 0 auto; }
   .petBarTrack{ flex:1; height:8px; border-radius:4px; background:rgba(255,255,255,.1); overflow:hidden; }
@@ -106,7 +99,7 @@
     100%{ opacity:0; transform:translateY(-22px) scale(1); }
   }
 
-  #petMilkCount{ position:relative; margin-top:6px; font-size:13px; font-weight:700; color:#bfe0ff; }
+  #petMilkCount{ margin-top:6px; font-size:13px; font-weight:700; color:#bfe0ff; }
 
   /* subtle idle "breathing" so she doesn't look frozen */
   #petSpriteWrap{ animation: petBreathe 3.2s ease-in-out infinite; }
