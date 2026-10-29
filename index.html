@@ -1171,6 +1171,13 @@
 
   // ---------- init ----------
   document.body.classList.toggle("showStatus", cfg.showStatus);
+  // a stale pendingSpinId can survive a reload that happened mid-spin (e.g. while
+  // debugging): without this, addDonation()'s guard (progress >= goal) stays
+  // tripped forever and new donations are silently ignored. Any real roulette
+  // widget that later sends the matching ack just no-ops against it (harmless).
+  if(hasProgressUI && cfg.pendingSpinId){
+    resumeAfterSpin(cfg.pendingSpinId);
+  }
   updateProgressUI();
   renderSettingsForm();
   // only the widget that shows the collection card owns the realtime connection,
