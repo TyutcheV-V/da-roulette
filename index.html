@@ -241,6 +241,13 @@
   .rarityWeightRow .rwLabel{ flex:1; font-weight:700; font-size:12px; }
   .rarityWeightRow input[type=number]{ width:70px; }
   .muted{ color:#888; font-size:11px; }
+  #historyList{ display:flex; flex-direction:column; gap:5px; margin-top:6px; max-height:220px; overflow-y:auto; }
+  .historyRow{ display:flex; align-items:center; gap:8px; padding:5px 7px; border-radius:6px; background:#1b1b22; font-size:12px; }
+  .historyRow.done{ opacity:.45; text-decoration:line-through; }
+  .historyRow .hDone{ width:auto; margin:0; }
+  .historyRow .hText{ flex:1; }
+  .historyRow .hTime{ color:#888; font-size:10px; white-space:nowrap; }
+  .historyEmpty{ color:#888; font-size:11px; }
   #authStatus{ font-size:12px; padding:6px 8px; border-radius:6px; background:#1b1b22; margin-top:4px; }
   #authStatus.ok{ color:#8bffb0; }
   #authStatus.bad{ color:#ff9b9b; }
@@ -353,6 +360,13 @@
       </div>
     </div>
 
+    <div>
+      <h3>История выпадений</h3>
+      <div class="muted">Что выпадало на рулетке — отмечай галочкой выполненное, чтобы не забыть.</div>
+      <div id="historyList"></div>
+      <button class="smallBtn" id="clearHistoryBtn">Очистить историю</button>
+    </div>
+
     <div class="progressOnlySection">
       <h3>Тест</h3>
       <div class="row">
@@ -434,6 +448,7 @@
       progress: 0,
       pendingSpinId: null,
       goalCrossedAt: null,
+      history: [],
       categories: DEFAULT_CATEGORIES.map(c => Object.assign({}, c)),
       rarityWeights: defaultRarityWeights()
     };
@@ -499,6 +514,8 @@
   const testSoundBtn = document.getElementById("testSoundBtn");
   const resetProgressBtn = document.getElementById("resetProgressBtn");
   const toggleStatusBtn = document.getElementById("toggleStatusBtn");
+  const historyList = document.getElementById("historyList");
+  const clearHistoryBtn = document.getElementById("clearHistoryBtn");
   const exportBtn = document.getElementById("exportBtn");
   const importBtn = document.getElementById("importBtn");
   const ioBox = document.getElementById("ioBox");
@@ -659,8 +676,69 @@
     renderRarityWeights();
     renderCategories();
     renderAuthStatus();
+    renderHistory();
     applyTitles();
   }
+
+  function formatHistoryTime(ts){
+    const d = new Date(ts);
+    const pad = n => String(n).padStart(2, "0");
+    return pad(d.getHours()) + ":" + pad(d.getMinutes());
+  }
+
+  function renderHistory(){
+    const items = cfg.history || [];
+    if(!items.length){
+      historyList.innerHTML = '<div class="historyEmpty">Пока пусто — здесь будут появляться результаты рулетки.</div>';
+      return;
+    }
+    historyList.innerHTML = items.map(entry => `
+      <div class="historyRow${entry.done ? " done" : ""}" data-id="${entry.id}">
+        <input type="checkbox" class="hDone" ${entry.done ? "checked" : ""}>
+        <span class="hText">${escapeHtml(entry.text)}</span>
+        <span class="hTime">${formatHistoryTime(entry.time)}</span>
+        <button class="smallBtn danger hRemove" type="button" title="Удалить">✕</button>
+      </div>
+    `).join("");
+  }
+
+  function logHistoryEntry(winner){
+    cfg.history = cfg.history || [];
+    cfg.history.unshift({
+      id: Date.now() + "_" + Math.random().toString(36).slice(2),
+      time: Date.now(),
+      text: winner.text,
+      categoryName: winner.categoryName,
+      done: false
+    });
+    if(cfg.history.length > 200) cfg.history.length = 200;
+    saveConfig();
+    renderHistory();
+  }
+
+  historyList.addEventListener("change", (e) => {
+    if(!e.target.classList.contains("hDone")) return;
+    const row = e.target.closest(".historyRow");
+    const entry = (cfg.history || []).find(h => h.id === row.dataset.id);
+    if(!entry) return;
+    entry.done = e.target.checked;
+    saveConfig();
+    row.classList.toggle("done", entry.done);
+  });
+
+  historyList.addEventListener("click", (e) => {
+    if(!e.target.classList.contains("hRemove")) return;
+    const row = e.target.closest(".historyRow");
+    cfg.history = (cfg.history || []).filter(h => h.id !== row.dataset.id);
+    saveConfig();
+    renderHistory();
+  });
+
+  clearHistoryBtn.addEventListener("click", () => {
+    cfg.history = [];
+    saveConfig();
+    renderHistory();
+  });
 
   function renderAuthStatus(){
     if(cfg.accessToken && cfg.tokenExpiresAt > Date.now()){
@@ -1038,6 +1116,7 @@
         winBanner.textContent = "Выпало: " + winner.text;
         winBanner.classList.add("show");
         playWin();
+        logHistoryEntry(winner);
         setTimeout(() => finishRouletteVisual(triggerId), cfg.winHold*1000);
       });
     });
