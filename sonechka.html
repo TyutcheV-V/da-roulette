@@ -64,7 +64,11 @@
     background:var(--card-navy-light); display:flex; align-items:center; justify-content:center;
     overflow:hidden;
   }
-  #petSpriteImg{ width:100%; height:100%; object-fit:cover; display:none; }
+  /* полноростовые арты показываем только сверху (голова/торс), а не целиком —
+     cover даёт нулевой запас по вертикали на этих почти квадратных картинках
+     (660x864), поэтому зумим чуть сильнее самого cover и прижимаем к верху,
+     остальное обрезается overflow:hidden у #petCard */
+  #petSpriteImg{ width:100%; height:100%; object-fit:cover; object-position:center top; transform:scale(1.2); transform-origin:50% 0%; display:none; }
   #petSpriteFallback{ font-size:56px; line-height:1; }
 
   /* decorative floating hearts, purely visual */
@@ -1102,7 +1106,7 @@
     petSpriteImg.style.display = "block";
     const w = weightTier(), m = moodState();
     petSpriteImg.alt = `Сонечка: ${WEIGHT_LABELS[w]}, ${MOOD_LABELS[m]}`;
-    petSpriteImg.src = `images/sonechka-${w}-${m}.png`;
+    petSpriteImg.src = `images/sonechka-${w}-${m}.webp`;
   }
 
   const CRITICAL_STAT_THRESHOLD = 25; // ниже этого иконка рядом с полоской начинает пульсировать
