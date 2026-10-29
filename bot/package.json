@@ -1,0 +1,16 @@
+{
+  "name": "sonechka-bot",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Twitch chat bot for Sonechka: credits caught milk litres and answers !молочко",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "tmi.js": "^1.8.5"
+  }
+}

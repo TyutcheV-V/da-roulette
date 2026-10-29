@@ -267,9 +267,10 @@
     </div>
     <div id="authStatus">не подключено</div>
 
-    <h3>Twitch-чат</h3>
-    <label>Имя канала (без @ и без twitch.tv/)</label>
-    <input type="text" id="cfgTwitchChannel" placeholder="например tyutchev_v">
+    <h3>Ловля молока (ведёт бот в чате)</h3>
+    <div class="muted">Саму команду в чате слушает отдельный Twitch-бот (не этот виджет) — он и начисляет литры. Значения ниже должны совпадать с тем, что настроено у бота.</div>
+    <label>Литров за один бидон</label>
+    <input type="number" id="cfgLitersPerFlood" value="10" min="1">
     <label>Команда для ловли молока</label>
     <input type="text" id="cfgCatchCommand" value="!ловлю">
     <label>Сколько секунд ловим (окно команды)</label>
@@ -402,7 +403,7 @@
     </div>
     <div id="statsBox">
       <div class="statsCol"><b>Топ донатеров на молоко</b><ol id="statsDonors"></ol></div>
-      <div class="statsCol"><b>Топ по выпитому молоку</b><ol id="statsDrinkers"></ol></div>
+      <div class="statsCol"><b>Топ по балансу молочка (л)</b><ol id="statsDrinkers"></ol></div>
     </div>
 
     <h3>Тест</h3>
@@ -447,7 +448,7 @@
     return {
       posX: 88,
       posY: 85,
-      twitchChannel: "",
+      litersPerFlood: 10, // один бидон = столько литров разбрызгивается
       donationMinAmount: 50,
       donationMaxAmount: 1000,   // донат такой суммы (и больше) даёт максимальный эффект
       catchCommand: "!ловлю",
@@ -566,7 +567,7 @@
   const logoutBtn = document.getElementById("logoutBtn");
   const authStatus = document.getElementById("authStatus");
 
-  const cfgTwitchChannel = document.getElementById("cfgTwitchChannel");
+  const cfgLitersPerFlood = document.getElementById("cfgLitersPerFlood");
   const cfgCatchCommand = document.getElementById("cfgCatchCommand");
   const cfgCatchWindow = document.getElementById("cfgCatchWindow");
   const arrangeModeBtn = document.getElementById("arrangeModeBtn");
@@ -659,7 +660,7 @@
     da = loadDA();
     cfgClientId.value = da.clientId || "";
     cfgProxyUrl.value = da.proxyUrl || "";
-    cfgTwitchChannel.value = cfg.twitchChannel || "";
+    cfgLitersPerFlood.value = cfg.litersPerFlood;
     cfgCatchCommand.value = cfg.catchCommand;
     cfgCatchWindow.value = cfg.catchWindowSeconds;
     cfgDonationMin.value = cfg.donationMinAmount;
@@ -760,7 +761,7 @@
 
   cfgClientId.addEventListener("change", () => { saveDA({clientId: cfgClientId.value.trim()}); da = loadDA(); });
   cfgProxyUrl.addEventListener("change", () => { saveDA({proxyUrl: cfgProxyUrl.value.trim().replace(/\/$/,"")}); da = loadDA(); });
-  cfgTwitchChannel.addEventListener("change", () => { cfg.twitchChannel = cfgTwitchChannel.value.trim(); saveConfig(); connectTwitch(); });
+  cfgLitersPerFlood.addEventListener("change", () => { cfg.litersPerFlood = Math.max(1, Number(cfgLitersPerFlood.value)||10); saveConfig(); });
   cfgCatchCommand.addEventListener("change", () => { cfg.catchCommand = cfgCatchCommand.value.trim() || "!ловлю"; saveConfig(); });
   cfgCatchWindow.addEventListener("change", () => { cfg.catchWindowSeconds = Number(cfgCatchWindow.value)||10; saveConfig(); });
   cfgDonationMin.addEventListener("change", () => { cfg.donationMinAmount = Number(cfgDonationMin.value)||50; saveConfig(); });
@@ -892,7 +893,6 @@
       renderSettingsForm();
       updatePetUI();
       applyPetPosition();
-      connectTwitch();
       alert("Настройки импортированы");
     }catch(e){ alert("Не получилось разобрать JSON: " + e.message); }
   });
@@ -971,6 +971,31 @@
   // ---------- stats (Upstash Redis via the proxy's /api/stats, no-ops gracefully if not set up yet) ----------
   function statsEndpoint(){
     return da.proxyUrl ? `${da.proxyUrl}/api/stats` : null;
+  }
+  function catchEndpoint(){
+    return da.proxyUrl ? `${da.proxyUrl}/api/catch` : null;
+  }
+  // открывает раунд ловли на сервере — бот в чате сам решает, кому и сколько
+  // литров засчитать по команде "!ловлю"; виджет только показывает результат
+  async function startCatchRoundOnServer(liters, ttlSeconds){
+    const url = catchEndpoint();
+    if(!url) return false;
+    try{
+      const r = await fetch(url, {
+        method:"POST", headers:{ "Content-Type":"application/json" },
+        body: JSON.stringify({ action:"start", liters, ttlSeconds })
+      });
+      return r.ok;
+    }catch(e){ console.warn("catch start failed", e); return false; }
+  }
+  async function fetchCatchStatus(){
+    const url = catchEndpoint();
+    if(!url) return null;
+    try{
+      const r = await fetch(`${url}?action=status`);
+      if(!r.ok) return null;
+      return await r.json();
+    }catch(e){ console.warn("catch status failed", e); return null; }
   }
   async function postStat(type, name, amount){
     const url = statsEndpoint();
@@ -1111,7 +1136,6 @@
   }
 
   function triggerFlood(){
-    const catchSlots = Math.max(1, Math.round(cfg.floodThreshold));
     cfg.milkCans = 0;
     cfg.floodThreshold = cfg.floodThreshold + Number(cfg.floodThresholdIncrement||1); // 10 -> 11 -> 12 ...
     saveConfig();
@@ -1125,34 +1149,36 @@
       try{ floodVideo.pause(); }catch(e){}
     }, (cfg.floodHoldSeconds||6)*1000);
     updatePetUI();
-    // ловля молока случается один раз, тут, на самой заливке — не на каждой дойке.
-    // ловцов может быть столько же, сколько было доек в этом цикле
-    startCatchRound(catchSlots);
+    // бидон = N литров молочка; раунд ловли ведёт бот в чате (засчитывает
+    // "!ловлю" каждому, кто напишет, пока литры не кончатся) — виджет только
+    // открывает раунд на сервере и потом показывает итог
+    startCatchRound(Math.max(1, Math.round(cfg.litersPerFlood||10)));
   }
 
-  let activeCatchRound = null;
-  function startCatchRound(catchSlots){
+  function startCatchRound(liters){
+    const windowSeconds = cfg.catchWindowSeconds||10;
     showBubble(`🥛 Сонечка брызгает молоком! Лови командой ${cfg.catchCommand}`);
     catchCmdLabel.textContent = cfg.catchCommand;
-    catchBanner.textContent = `🥛 Лови команду ${cfg.catchCommand}! Мест: ${catchSlots}`;
+    catchBanner.textContent = `🥛 Лови команду ${cfg.catchCommand}! Литров: ${liters}`;
     catchBanner.classList.add("show");
-    activeCatchRound = { active:true, slots:catchSlots, catchers:new Map() };
-    const round = activeCatchRound;
-    setTimeout(() => {
-      if(activeCatchRound === round) activeCatchRound = null;
+    startCatchRoundOnServer(liters, windowSeconds + 5); // +5с запас на задержку бота
+    setTimeout(async () => {
       catchBanner.classList.remove("show");
-      const names = Array.from(round.catchers.values()).slice(0, catchSlots);
-      if(names.length){
-        names.forEach(name => postStat("drinker", name, 1));
+      const status = await fetchCatchStatus();
+      const catches = (status && status.catches) || [];
+      if(catches.length){
+        const counts = new Map();
+        catches.forEach(name => counts.set(name, (counts.get(name)||0) + 1));
+        const summary = Array.from(counts.entries()).map(([name, n]) => `${name} — ${n} л`).join(", ");
         playFile("sounds/bleat.mp3");
-        catchWinnersBanner.textContent = "🐐 Поймали молоко: " + names.join(", ");
+        catchWinnersBanner.textContent = "🐐 Поймали молоко: " + summary;
         catchWinnersBanner.classList.add("show");
         setTimeout(() => catchWinnersBanner.classList.remove("show"), 6000);
       } else {
         showBubble("Молоко никто не поймал, разлилось...");
       }
       fetchStats();
-    }, (cfg.catchWindowSeconds||10)*1000);
+    }, windowSeconds*1000);
   }
 
   // ---------- decay over time (neglect) ----------
@@ -1311,59 +1337,6 @@
     }, reconnectDelay);
   }
 
-  // ---------- Twitch chat (anonymous read-only IRC over WebSocket — no proxy needed) ----------
-  let twitchWs = null, twitchReconnectDelay = 2000, twitchReconnectTimer = null;
-  function connectTwitch(){
-    if(twitchWs){ try{ twitchWs.close(); }catch(e){} twitchWs = null; }
-    if(twitchReconnectTimer){ clearTimeout(twitchReconnectTimer); twitchReconnectTimer = null; }
-    const channel = (cfg.twitchChannel||"").trim().toLowerCase().replace(/^#/, "");
-    if(!channel) return;
-    twitchWs = new WebSocket("wss://irc-ws.chat.twitch.tv:443");
-    twitchWs.addEventListener("open", () => {
-      twitchWs.send("CAP REQ :twitch.tv/tags twitch.tv/commands");
-      twitchWs.send("PASS justchecking");
-      twitchWs.send("NICK justinfan" + Math.floor(10000 + Math.random()*90000));
-      twitchWs.send("JOIN #" + channel);
-      twitchReconnectDelay = 2000;
-    });
-    twitchWs.addEventListener("message", (ev) => {
-      String(ev.data).split("\r\n").filter(Boolean).forEach(handleTwitchLine);
-    });
-    twitchWs.addEventListener("close", scheduleTwitchReconnect);
-    twitchWs.addEventListener("error", () => {});
-  }
-  function scheduleTwitchReconnect(){
-    if(twitchReconnectTimer || !cfg.twitchChannel) return;
-    twitchReconnectTimer = setTimeout(() => {
-      twitchReconnectTimer = null;
-      twitchReconnectDelay = Math.min(30000, twitchReconnectDelay*1.7);
-      connectTwitch();
-    }, twitchReconnectDelay);
-  }
-  function handleTwitchLine(line){
-    if(line.startsWith("PING")){ twitchWs.send("PONG :tmi.twitch.tv"); return; }
-    let rest = line;
-    const tags = {};
-    if(rest.startsWith("@")){
-      const sp = rest.indexOf(" ");
-      rest.slice(1, sp).split(";").forEach(kv => {
-        const i = kv.indexOf("=");
-        if(i > 0) tags[kv.slice(0,i)] = kv.slice(i+1);
-      });
-      rest = rest.slice(sp+1);
-    }
-    const m = rest.match(/^:([^!]+)!\S+ PRIVMSG #\S+ :(.*)$/);
-    if(!m) return;
-    const login = m[1];
-    const text = m[2];
-    const displayName = tags["display-name"] || login;
-    if(activeCatchRound && activeCatchRound.active){
-      if(text.trim().toLowerCase() === cfg.catchCommand.trim().toLowerCase()){
-        activeCatchRound.catchers.set(login, displayName);
-      }
-    }
-  }
-
   // ---------- init ----------
   applyPetPosition();
   updatePetUI();
@@ -1371,7 +1344,6 @@
   renderSettingsForm();
   if(isDockSettings) settingsPanel.classList.add("open");
   connectRealtime();
-  connectTwitch();
   fetchStats();
   if(!isDockSettings){
     scheduleNextPopup();
