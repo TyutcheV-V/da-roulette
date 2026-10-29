@@ -232,6 +232,11 @@
     </div>
     <label>Множитель молока за уровень роста (0.5 = +50% за уровень)</label>
     <input type="number" id="cfgMilkGrowthFactor" value="0.5" step="0.1" min="0">
+    <div class="muted" style="margin-top:6px;">Молоко берётся из её счастья и сытости — чем она устала и голоднее, тем меньше даёт. Если совсем истощена — молока не будет, пока не покормят.</div>
+    <div class="row">
+      <div><label>Счастье за дойку (минус)</label><input type="number" id="cfgMilkHappinessCost" value="10" min="0"></div>
+      <div><label>Сытость за дойку (минус)</label><input type="number" id="cfgMilkFullnessCost" value="10" min="0"></div>
+    </div>
 
     <h3>Голод и грусть без донатов</h3>
     <div class="row">
@@ -311,6 +316,8 @@
       petHappinessStep: 20,
       milkBaseYield: 1,
       milkGrowthFactor: 0.5,
+      milkHappinessCost: 10,
+      milkFullnessCost: 10,
       decayCheckHours: 6,
       decayStep: 10,
       floodThreshold: 10,
@@ -404,6 +411,8 @@
   const cfgPetHappiness = document.getElementById("cfgPetHappiness");
   const cfgMilkBase = document.getElementById("cfgMilkBase");
   const cfgMilkGrowthFactor = document.getElementById("cfgMilkGrowthFactor");
+  const cfgMilkHappinessCost = document.getElementById("cfgMilkHappinessCost");
+  const cfgMilkFullnessCost = document.getElementById("cfgMilkFullnessCost");
   const cfgDecayHours = document.getElementById("cfgDecayHours");
   const cfgDecayStep = document.getElementById("cfgDecayStep");
   const cfgFloodThreshold = document.getElementById("cfgFloodThreshold");
@@ -471,6 +480,8 @@
     cfgPetHappiness.value = cfg.petHappinessStep;
     cfgMilkBase.value = cfg.milkBaseYield;
     cfgMilkGrowthFactor.value = cfg.milkGrowthFactor;
+    cfgMilkHappinessCost.value = cfg.milkHappinessCost;
+    cfgMilkFullnessCost.value = cfg.milkFullnessCost;
     cfgDecayHours.value = cfg.decayCheckHours;
     cfgDecayStep.value = cfg.decayStep;
     cfgFloodThreshold.value = cfg.floodThreshold;
@@ -597,6 +608,8 @@
   cfgPetHappiness.addEventListener("change", () => { cfg.petHappinessStep = Number(cfgPetHappiness.value)||20; saveConfig(); });
   cfgMilkBase.addEventListener("change", () => { cfg.milkBaseYield = Number(cfgMilkBase.value)||1; saveConfig(); });
   cfgMilkGrowthFactor.addEventListener("change", () => { cfg.milkGrowthFactor = Number(cfgMilkGrowthFactor.value)||0; saveConfig(); });
+  cfgMilkHappinessCost.addEventListener("change", () => { cfg.milkHappinessCost = Number(cfgMilkHappinessCost.value)||0; saveConfig(); });
+  cfgMilkFullnessCost.addEventListener("change", () => { cfg.milkFullnessCost = Number(cfgMilkFullnessCost.value)||0; saveConfig(); });
   cfgDecayHours.addEventListener("change", () => { cfg.decayCheckHours = Number(cfgDecayHours.value)||6; saveConfig(); });
   cfgDecayStep.addEventListener("change", () => { cfg.decayStep = Number(cfgDecayStep.value)||10; saveConfig(); });
   cfgFloodThreshold.addEventListener("change", () => { cfg.floodThreshold = Number(cfgFloodThreshold.value)||10; saveConfig(); updatePetUI(); });
@@ -757,13 +770,22 @@
       showBubble(`${donorName} погладил(а) Сонечку! 💛`);
       playFile("sounds/pet.mp3");
     } else if(action.effect === "milk"){
-      const yieldAmount = Math.max(1, Math.round(Number(cfg.milkBaseYield||1) * (1 + (cfg.growth-1)*Number(cfg.milkGrowthFactor||0.5))));
-      cfg.happiness = Math.min(100, cfg.happiness + 5);
-      cfg.milkCans += yieldAmount;
+      // milk comes FROM her happiness and fullness, not out of nowhere —
+      // a tired, hungry Сонечка gives noticeably less
+      const condition = Math.max(0.2, (cfg.happiness + cfg.fullness) / 200);
+      const growthMult = 1 + (cfg.growth-1)*Number(cfg.milkGrowthFactor||0.5);
+      const yieldAmount = Math.max(0, Math.round(Number(cfg.milkBaseYield||1) * growthMult * condition));
+      cfg.happiness = Math.max(0, cfg.happiness - Number(cfg.milkHappinessCost||10));
+      cfg.fullness = Math.max(0, cfg.fullness - Number(cfg.milkFullnessCost||10));
       postStat("donor", donorName, amount);
       playFile("sounds/milk.mp3");
-      startCatchRound(yieldAmount, donorName);
-      if(cfg.milkCans >= cfg.floodThreshold) triggerFlood();
+      if(yieldAmount <= 0){
+        showBubble(`Сонечка слишком устала для молока... покормите и погладьте её! 😿`);
+      } else {
+        cfg.milkCans += yieldAmount;
+        startCatchRound(yieldAmount, donorName);
+        if(cfg.milkCans >= cfg.floodThreshold) triggerFlood();
+      }
     }
     saveConfig();
     updatePetUI();
