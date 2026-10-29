@@ -396,6 +396,7 @@
   const STORE_KEY = "da_roulette_cfg_v2";
   const SPIN_TRIGGER_KEY = "da_roulette_spin_trigger_v1";
   const SPIN_RESULT_KEY = "da_roulette_spin_result_v1";
+  const HISTORY_SYNC_KEY = "da_roulette_history_sync_v1";
 
   const urlParams = new URLSearchParams(location.search);
   const viewMode = urlParams.get("view"); // null/other = full widget, "progress", "roulette"
@@ -714,6 +715,7 @@
     if(cfg.history.length > 200) cfg.history.length = 200;
     saveConfig();
     renderHistory();
+    writeKey(HISTORY_SYNC_KEY, String(Date.now()));
   }
 
   historyList.addEventListener("change", (e) => {
@@ -724,6 +726,7 @@
     entry.done = e.target.checked;
     saveConfig();
     row.classList.toggle("done", entry.done);
+    writeKey(HISTORY_SYNC_KEY, String(Date.now()));
   });
 
   historyList.addEventListener("click", (e) => {
@@ -732,11 +735,22 @@
     cfg.history = (cfg.history || []).filter(h => h.id !== row.dataset.id);
     saveConfig();
     renderHistory();
+    writeKey(HISTORY_SYNC_KEY, String(Date.now()));
   });
 
   clearHistoryBtn.addEventListener("click", () => {
     cfg.history = [];
     saveConfig();
+    renderHistory();
+    writeKey(HISTORY_SYNC_KEY, String(Date.now()));
+  });
+
+  // another OBS source (e.g. the roulette reel) can log a win while this page
+  // (e.g. a settings dock) sits open — pull its history in without touching
+  // the rest of this page's in-memory config, so nothing else gets clobbered
+  watchKey(HISTORY_SYNC_KEY, (val) => {
+    if(!val) return;
+    cfg.history = loadConfig().history;
     renderHistory();
   });
 
