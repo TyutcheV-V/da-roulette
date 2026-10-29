@@ -384,11 +384,11 @@
     <h3>Заливка молоком</h3>
     <div class="muted">Ловля молока чатом (команда «!ловлю») происходит один раз — именно в момент большой заливки, не на каждой дойке. Поймать может столько человек, сколько было доек в этом цикле (первые по очереди в чате).</div>
     <div class="row" style="margin-top:6px;">
-      <div><label>Доек до заливки (сейчас)</label><input type="number" id="cfgFloodThreshold" value="10" min="1"></div>
+      <div><label>Доек до заливки</label><input type="number" id="cfgFloodThreshold" value="10" min="1"></div>
       <div><label>Держать на экране, сек</label><input type="number" id="cfgFloodHold" value="6" min="1"></div>
     </div>
-    <label>Насколько растёт порог после каждой заливки (10 → 11 → 12...)</label>
-    <input type="number" id="cfgFloodIncrement" value="1" min="0">
+    <label>Каждые сколько заливок растёт количество литров (1-я и 2-я — 10л, 3-я и 4-я — 11л, 5-я — 12л...)</label>
+    <input type="number" id="cfgLiterIncreaseEvery" value="2" min="1">
     <label>Насколько растёт счастье после заливки (ей полегчало)</label>
     <input type="number" id="cfgFloodHappinessBoost" value="30" min="0" max="100">
     <label>Текст на весь экран при заливке</label>
@@ -527,7 +527,8 @@
       overflowSlowMinutes: 3,    // минут замедленного падения за каждое очко "перелива" (донат на уже полную полоску)
       overflowSlowFactor: 0.4,   // во время замедления падение идёт с этой долей скорости (0.4 = на 60% медленнее)
       floodThreshold: 10,
-      floodThresholdIncrement: 1, // 10 -> 11 -> 12 ... after each flood
+      literIncreaseEvery: 2,    // каждые N заливок литры растут на 1 (1,2-я - 10л, 3,4-я - 11л, 5-я - 12л...)
+      floodCount: 0,            // сколько заливок уже было — runtime-счётчик для литров выше
       floodHappinessBoost: 30,  // после заливки ей полегчало — счастье подскакивает
       floodWarningSeconds: 10,    // держим "ЩАС ЛОПНЕТ" перед самой заливкой
       floodHoldSeconds: 6,
@@ -665,7 +666,7 @@
   const cfgPetPhrases = document.getElementById("cfgPetPhrases");
   const cfgFloodThreshold = document.getElementById("cfgFloodThreshold");
   const cfgFloodHappinessBoost = document.getElementById("cfgFloodHappinessBoost");
-  const cfgFloodIncrement = document.getElementById("cfgFloodIncrement");
+  const cfgLiterIncreaseEvery = document.getElementById("cfgLiterIncreaseEvery");
   const cfgFloodHold = document.getElementById("cfgFloodHold");
   const cfgFloodText = document.getElementById("cfgFloodText");
   const cfgFloodWarning = document.getElementById("cfgFloodWarning");
@@ -761,7 +762,7 @@
     cfgFloodThreshold.value = cfg.floodThreshold;
     cfgFloodHappinessBoost.value = cfg.floodHappinessBoost;
     cfgFloodHold.value = cfg.floodHoldSeconds;
-    cfgFloodIncrement.value = cfg.floodThresholdIncrement;
+    cfgLiterIncreaseEvery.value = cfg.literIncreaseEvery;
     cfgFloodText.value = cfg.floodText;
     cfgFloodWarning.value = cfg.floodWarningSeconds;
     cfgBurstText.value = cfg.burstWarningText;
@@ -917,7 +918,7 @@
   cfgPetPhrases.addEventListener("change", () => { cfg.petPhrases = cfgPetPhrases.value; saveConfig(); });
   cfgFloodThreshold.addEventListener("change", () => { cfg.floodThreshold = Number(cfgFloodThreshold.value)||10; saveConfig(); updatePetUI(); });
   cfgFloodHold.addEventListener("change", () => { cfg.floodHoldSeconds = Number(cfgFloodHold.value)||6; saveConfig(); });
-  cfgFloodIncrement.addEventListener("change", () => { cfg.floodThresholdIncrement = Number(cfgFloodIncrement.value)||0; saveConfig(); });
+  cfgLiterIncreaseEvery.addEventListener("change", () => { cfg.literIncreaseEvery = Math.max(1, Number(cfgLiterIncreaseEvery.value)||2); saveConfig(); });
   cfgFloodHappinessBoost.addEventListener("change", () => { cfg.floodHappinessBoost = Number(cfgFloodHappinessBoost.value)||0; saveConfig(); });
   cfgFloodText.addEventListener("change", () => { cfg.floodText = cfgFloodText.value || "СОНЕЧКА ЗАЛИВАЕТ ВАС МОЛОЧКОМ"; saveConfig(); });
   cfgFloodWarning.addEventListener("change", () => { cfg.floodWarningSeconds = Number(cfgFloodWarning.value)||0; saveConfig(); });
@@ -942,7 +943,7 @@
   testPopupBtn.addEventListener("click", () => showMoodPopup());
 
   resetPetBtn.addEventListener("click", () => {
-    Object.assign(cfg, { happiness:70, fullness:70, growth:1, milkGauge:0, milkCans:0, happinessSlowUntil:0, fullnessSlowUntil:0, lastInteractionAt:Date.now(), lastDecayTickAt:Date.now() });
+    Object.assign(cfg, { happiness:70, fullness:70, growth:1, milkGauge:0, milkCans:0, floodCount:0, happinessSlowUntil:0, fullnessSlowUntil:0, lastInteractionAt:Date.now(), lastDecayTickAt:Date.now() });
     saveConfig(); updatePetUI();
   });
 
@@ -1287,7 +1288,10 @@
 
   function triggerFlood(){
     cfg.milkCans = 0;
-    cfg.floodThreshold = cfg.floodThreshold + Number(cfg.floodThresholdIncrement||1); // 10 -> 11 -> 12 ...
+    // каждые literIncreaseEvery заливок литры растут на 1 (1,2-я - 10л, 3,4-я - 11л, 5-я - 12л...)
+    const every = Math.max(1, Number(cfg.literIncreaseEvery||2));
+    const liters = Math.max(1, Math.round(cfg.litersPerFlood||10)) + Math.floor((cfg.floodCount||0)/every);
+    cfg.floodCount = (cfg.floodCount||0) + 1;
     const happinessGain = Number(cfg.floodHappinessBoost||0);
     if(happinessGain > 0){
       cfg.happiness = Math.min(100, cfg.happiness + happinessGain); // полегчало — выплеснула молоко
@@ -1313,7 +1317,7 @@
     // бидон = N литров молочка; раунд ловли ведёт бот в чате (засчитывает
     // "!ловлю" каждому, кто напишет, пока литры не кончатся) — виджет только
     // открывает раунд на сервере и потом показывает итог
-    startCatchRound(Math.max(1, Math.round(cfg.litersPerFlood||10)));
+    startCatchRound(liters);
   }
 
   function startCatchRound(liters){
