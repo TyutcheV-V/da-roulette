@@ -7,8 +7,8 @@ const KV_TOKEN = process.env.UPSTASH_REDIS_REST_TOKEN || process.env.KV_REST_API
 async function redis(...command) {
   const res = await fetch(KV_URL, {
     method: "POST",
-    headers: { Authorization: `Bearer ${KV_TOKEN}`, "Content-Type": "application/json" },
-    body: JSON.stringify(command),
+    headers: { Authorization: `Bearer ${KV_TOKEN}`, "Content-Type": "application/json; charset=utf-8" },
+    body: Buffer.from(JSON.stringify(command), "utf-8"),
   });
   const json = await res.json();
   if (json.error) throw new Error(json.error);
@@ -49,6 +49,10 @@ module.exports = async function handler(req, res) {
     }
     if (req.method === "POST") {
       const { type, name, amount } = req.body || {};
+      if (req.query.debug === "1") {
+        res.status(200).json({ receivedName: name, charCodes: name ? Array.from(name).map(c=>c.charCodeAt(0)) : null });
+        return;
+      }
       if (!name || !amount || (type !== "donor" && type !== "drinker")) {
         res.status(400).json({ error: "bad request" });
         return;
