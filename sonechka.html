@@ -298,7 +298,7 @@
     <input type="range" id="cfgSoundVolume" min="0" max="100" value="80">
 
     <h3>Действия по донату</h3>
-    <div class="muted">Сонечка реагирует, если в сообщении доната есть одно из ключевых слов (через запятую) и сумма не меньше минималки ниже. Чем ближе сумма доната к максимальной — тем сильнее эффект.</div>
+    <div class="muted">Сонечка реагирует, если в сообщении доната есть одно из ключевых слов (через запятую) и сумма не меньше минималки ниже. Эффект пропорционален сумме доната: даже минимальный донат даёт небольшой эффект, а при сумме от максимальной и выше — эффект полный.</div>
     <div class="row" style="margin-top:6px;">
       <div><label>Минимальная сумма доната, чтобы она среагировала</label><input type="number" id="cfgDonationMin" value="50" min="1"></div>
       <div><label>Сумма доната для максимального эффекта</label><input type="number" id="cfgDonationMax" value="1000" min="1"></div>
@@ -317,8 +317,8 @@
       <div><label>Заполнение шкалы дойки за дойку (при макс. донате)</label><input type="number" id="cfgMilkGaugeFill" value="40" min="1"></div>
     </div>
     <div class="row">
-      <div><label>Счастье за дойку (минус)</label><input type="number" id="cfgMilkHappinessCost" value="10" min="0"></div>
-      <div><label>Сытость за дойку (минус)</label><input type="number" id="cfgMilkFullnessCost" value="10" min="0"></div>
+      <div><label>Счастье за дойку, минус (при макс. донате)</label><input type="number" id="cfgMilkHappinessCost" value="10" min="0"></div>
+      <div><label>Сытость за дойку, минус (при макс. донате)</label><input type="number" id="cfgMilkFullnessCost" value="10" min="0"></div>
     </div>
 
     <h3>Голод и грусть без донатов</h3>
@@ -967,10 +967,11 @@
   }
 
   // чем ближе донат к максимальной сумме — тем сильнее эффект (0..1)
+  // напрямую пропорционально сумме доната (а не диапазону мин-макс), поэтому
+  // даже минимальный донат даёт небольшой, но не нулевой эффект
   function donationStrength01(amount){
-    const lo = Number(cfg.donationMinAmount||50);
-    const hi = Math.max(lo+1, Number(cfg.donationMaxAmount||1000));
-    return Math.max(0, Math.min(1, (amount - lo) / (hi - lo)));
+    const hi = Math.max(1, Number(cfg.donationMaxAmount||1000));
+    return Math.max(0, Math.min(1, amount / hi));
   }
 
   // донат на уже полную (или почти полную) полоску не пропадает зря — перелив
@@ -1004,8 +1005,8 @@
       // снижает счастье/сытость; при заполнении шкалы до 100% — бидон, шкала в ноль
       const gaugeFill = Number(cfg.milkGaugeFillPerDonation||40)*strength;
       cfg.milkGauge = (cfg.milkGauge||0) + gaugeFill;
-      cfg.happiness = Math.max(0, cfg.happiness - Number(cfg.milkHappinessCost||0));
-      cfg.fullness = Math.max(0, cfg.fullness - Number(cfg.milkFullnessCost||0));
+      cfg.happiness = Math.max(0, cfg.happiness - Number(cfg.milkHappinessCost||0)*strength);
+      cfg.fullness = Math.max(0, cfg.fullness - Number(cfg.milkFullnessCost||0)*strength);
       postStat("donor", donorName, amount);
       playFile("sounds/milk.mp3");
       let gainedCans = 0;
