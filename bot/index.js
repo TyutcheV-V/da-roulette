@@ -88,3 +88,14 @@ client.connect().catch((e) => {
   console.error("failed to connect to Twitch", e);
   process.exit(1);
 });
+
+// Render's free Web Service tier requires binding to a port and answering
+// HTTP, and spins the service down after inactivity unless something pings
+// it — this endpoint is what an external uptime pinger (e.g. UptimeRobot)
+// hits every few minutes to keep the bot connected during streams.
+const http = require("http");
+const PORT = process.env.PORT || 3000;
+http.createServer((req, res) => {
+  res.writeHead(200, { "Content-Type": "text/plain; charset=utf-8" });
+  res.end("Сонечка-бот жива\n");
+}).listen(PORT, () => console.log(`health check server listening on :${PORT}`));
