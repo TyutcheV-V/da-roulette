@@ -1550,6 +1550,8 @@
     }).filter(Boolean);
     hints.push(`В момент заливки ловите молоко командой ${cfg.catchCommand} в чате!`);
     hints.push(`Накопили молочко? Закажите просьбу: ${cfg.requestCommand} <текст> (-${Math.round(cfg.requestCost||1)} л)`);
+    const hasMilkAction = (cfg.actions||[]).some(a => a.enabled !== false && a.effect === "milk");
+    if(hasMilkAction) hints.push(`Донатите на дойку под именем, которым пишете в чат — иначе кешбек молочка не найдётся по !молочко!`);
     return hints;
   }
   let hintIdx = 0;
