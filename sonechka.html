@@ -96,15 +96,15 @@
   }
   .petHeaderHeart{ font-size:11px; }
 
-  /* внешняя шкала молока — отдельно от карточки, впритык к её правому краю */
+  /* внешняя шкала молока — вплотную к краю карточки (лёгкий нахлёст, без зазора) */
   #milkTubeWrap{
-    position:absolute; left:100%; top:0; margin-left:4px; height:100%; z-index:2;
+    position:absolute; left:100%; top:0; margin-left:-2px; height:100%; z-index:2;
     display:flex; flex-direction:column; align-items:center;
   }
   #milkTube{
-    width:18px; flex:1 1 auto; border-radius:10px;
-    background:rgba(40,70,100,.55); border:2px solid rgba(190,230,255,.9);
-    box-shadow:inset 0 0 6px rgba(255,255,255,.25), 0 0 8px rgba(120,200,255,.35);
+    width:20px; flex:1 1 auto; border-radius:10px;
+    background:rgba(15,35,55,.92); border:3px solid #cdeeff;
+    box-shadow:inset 0 0 6px rgba(255,255,255,.3), 0 0 10px rgba(120,200,255,.5);
     overflow:hidden; display:flex; flex-direction:column; justify-content:flex-end;
   }
   #milkTubeFill{
@@ -114,7 +114,7 @@
     transition:height .6s ease;
   }
   /* бутылка слегка наезжает на низ шкалы, как будто шкала — это горлышко бутылки */
-  #milkBucketIcon{ width:34px; height:auto; margin-top:-10px; z-index:1; filter:drop-shadow(0 2px 4px rgba(0,0,0,.5)); flex:0 0 auto; }
+  #milkBucketIcon{ width:52px; height:auto; margin-top:-14px; z-index:1; filter:drop-shadow(0 2px 4px rgba(0,0,0,.5)); flex:0 0 auto; }
 
   /* bottom overlay: gradient scrim + three stat pairs (icon over percentage) */
   #petStatsOverlay{
@@ -159,14 +159,28 @@
     75%{ transform:translate(calc(-50% + 3px),-50%) rotate(2deg); }
   }
 
-  /* ---------- speech bubble (now a child of #petCard, so it follows it when dragged) ---------- */
-  #petBubble{
-    position:absolute; left:50%; bottom:100%; transform:translateX(-50%) translateY(6px);
-    width:216px; box-sizing:border-box; margin-bottom:10px; padding:8px 12px; border-radius:12px;
-    background:rgba(18,26,44,.95); border:1px solid var(--card-border); font-size:13px; font-weight:600;
-    text-align:center; opacity:0; pointer-events:none; transition:opacity .3s ease, transform .3s ease;
+  /* ---------- speech bubble (now a child of #petCard, so it follows it when dragged) ----------
+     фон — присланная картинка розового облачка с хвостиком (хвостик у
+     картинки ближе к левому краю, поэтому сдвигаем не по центру, а чуть
+     левее, чтобы он указывал примерно на неё); текст — во "внутренней"
+     безопасной зоне облака, подальше от сердечек/бликов по краям */
+  #petBubble, #hintBubble{
+    position:absolute; left:50%; bottom:100%; margin-bottom:-6px;
+    width:340px; aspect-ratio:1536/1024; box-sizing:border-box;
+    background:url(images/speech-bubble-cloud.png) center/100% 100% no-repeat;
+    display:flex; align-items:center; justify-content:center;
+    padding:15% 23% 35% 24%;
+    color:#5a1030; font-size:14px; font-weight:700; line-height:1.25;
+    text-align:center; opacity:0; pointer-events:none;
+    transform:translateX(-38%) translateY(8px) scale(.7);
+    transition:opacity .2s ease;
   }
-  #petBubble.show{ opacity:1; transform:translateX(-50%) translateY(0); }
+  #petBubble.show, #hintBubble.show{ opacity:1; animation:bubblePop .4s cubic-bezier(.34,1.56,.64,1) forwards; }
+  @keyframes bubblePop{
+    0%{ transform:translateX(-38%) translateY(8px) scale(.6); opacity:0; }
+    60%{ transform:translateX(-38%) translateY(-3px) scale(1.06); opacity:1; }
+    100%{ transform:translateX(-38%) translateY(0) scale(1); opacity:1; }
+  }
 
   /* ---------- catch banner ---------- */
   #catchBanner{
@@ -250,14 +264,7 @@
     text-shadow:0 0 16px rgba(255,80,80,.8), 0 3px 6px rgba(0,0,0,.8);
   }
 
-  /* idle hint bubble above the card, cycling through tips */
-  #hintBubble{
-    position:absolute; left:50%; transform:translateX(-50%) translateY(6px); bottom:100%; margin-bottom:10px;
-    width:216px; box-sizing:border-box; padding:8px 12px; border-radius:12px; background:rgba(40,26,10,.95); border:1px solid #7a5a2a;
-    font-size:12px; font-weight:600; text-align:center; color:#ffe6b0;
-    opacity:0; pointer-events:none; transition:opacity .4s ease, transform .4s ease;
-  }
-  #hintBubble.show{ opacity:1; transform:translateX(-50%) translateY(0); }
+  /* idle hint bubble — стилизовано вместе с #petBubble выше (то же облако) */
 
   /* ---------- gear / settings (same pattern as the roulette widget) ---------- */
   #secretCorner{ position:absolute; top:0; left:0; width:34px; height:34px; z-index:60; background:transparent; }
@@ -335,14 +342,14 @@
       </div>
       <div class="petHeartDeco" style="left:14%; top:14%;">💗</div>
       <div class="petHeartDeco" style="left:78%; top:22%; animation-delay:.6s;">💞</div>
-      <div id="petBubble"></div>
-      <div id="hintBubble"></div>
       <div id="petStatsOverlay">
         <div class="petStatItem" id="petHappyBar"><img id="happyLabel" class="petStatIcon" alt="счастье"><span id="happyPct" class="petStatPct">70%</span></div>
         <div class="petStatItem" id="petFullBar"><img id="fullLabel" class="petStatIcon" alt="сытость"><span id="fullPct" class="petStatPct">70%</span></div>
       </div>
     </div>
     <div id="petNameHeader"><span class="petHeaderHeart">💗</span>Сонечка<span class="petHeaderHeart">💗</span></div>
+    <div id="petBubble"></div>
+    <div id="hintBubble"></div>
     <div id="milkTubeWrap">
       <div id="milkTube"><div id="milkTubeFill"></div></div>
       <img id="milkBucketIcon" src="images/icons/moloko_100.png" alt="бутылка молока">
@@ -1167,6 +1174,7 @@
     fullPctEl.textContent = Math.round(fullPct) + "%";
     happyLabel.classList.toggle("critical", happyPct < CRITICAL_STAT_THRESHOLD);
     fullLabel.classList.toggle("critical", fullPct < CRITICAL_STAT_THRESHOLD);
+    pushPetState();
   }
 
   // всплывающая "+N" над нужной полоской — быстрая игровая обратная связь на донат
@@ -1252,6 +1260,15 @@
         body: JSON.stringify({ text })
       });
     }catch(e){ console.warn("nag request failed", e); }
+  }
+  // публикует текущие счастье/сытость/молоко на бэкенд — бот отвечает ими на "!сонечка"
+  function pushPetState(){
+    const url = catchEndpoint();
+    if(!url) return;
+    fetch(url, {
+      method:"POST", headers:{ "Content-Type":"application/json" },
+      body: JSON.stringify({ action:"state", happiness: cfg.happiness, fullness: cfg.fullness, milkGauge: cfg.milkGauge||0 })
+    }).catch(()=>{});
   }
   // открывает раунд ловли на сервере — бот в чате сам решает, кому и сколько
   // литров засчитать по команде "!ловлю"; виджет только показывает результат

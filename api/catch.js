@@ -18,6 +18,7 @@ const REQUESTS_KEY = "sonechka:requests"; // queue of paid "!просьба" ask
 const REQUESTS_LOG_KEY = "sonechka:requests:log"; // same asks, kept permanently for the dashboard (api/stats.js reads this)
 const REQUESTS_LOG_MAX = 200;
 const REQUEST_TEXT_MAX_LEN = 150;
+const PET_STATE_KEY = "sonechka:petstate"; // last-known happiness/fullness/milkGauge, for the "!сонечка" chat command
 
 function sanitizeRequestText(text) {
   return String(text || "")
@@ -91,6 +92,13 @@ module.exports = async function handler(req, res) {
         res.status(200).json({ requests });
         return;
       }
+      // последние известные счастье/сытость/молоко — для "!сонечка" в чате
+      if (action === "state") {
+        const raw = await redis("GET", PET_STATE_KEY);
+        const state = raw ? JSON.parse(raw) : null;
+        res.status(200).json(state || { happiness: null, fullness: null, milkGauge: null, at: null });
+        return;
+      }
       res.status(400).json({ error: "unknown action" });
       return;
     }
@@ -107,6 +115,18 @@ module.exports = async function handler(req, res) {
         await redis("SET", ROUND_KEY, liters, "EX", ttlSeconds);
         await redis("DEL", CATCHES_KEY);
         res.status(200).json({ ok: true, liters });
+        return;
+      }
+
+      // виджет периодически публикует свои текущие счастье/сытость/молоко —
+      // для "!сонечка" в чате; без секрета (та же экспозиция, что у остальных
+      // read-ish действий — это не баланс, просто текущие показатели питомца)
+      if (action === "state") {
+        const happiness = Math.max(0, Math.min(100, Number(body.happiness) || 0));
+        const fullness = Math.max(0, Math.min(100, Number(body.fullness) || 0));
+        const milkGauge = Math.max(0, Math.min(100, Number(body.milkGauge) || 0));
+        await redis("SET", PET_STATE_KEY, JSON.stringify({ happiness, fullness, milkGauge, at: Date.now() }));
+        res.status(200).json({ ok: true });
         return;
       }
 

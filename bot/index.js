@@ -4,7 +4,8 @@
 // source of truth for rounds and balances — this bot holds no Redis
 // credentials itself). Answers "!молочко" by looking up the sender's balance,
 // "!просьба <текст>" spends balance to queue an ask for the widget, and
-// "!взболтать <N>" gambles N litres on a random outcome (backend decides it).
+// "!взболтать <N>" gambles N litres on a random outcome (backend decides it),
+// and "!сонечка" reports her last-known happiness/fullness/milk gauge.
 const tmi = require("tmi.js");
 
 const BOT_USERNAME = requireEnv("TWITCH_BOT_USERNAME");
@@ -17,6 +18,7 @@ const BALANCE_COMMAND = (process.env.BALANCE_COMMAND || "!молочко").trim(
 const REQUEST_COMMAND = (process.env.REQUEST_COMMAND || "!просьба").trim().toLowerCase();
 const REQUEST_COST = Math.max(1, Math.round(Number(process.env.REQUEST_COST) || 1));
 const SHAKE_COMMAND = (process.env.SHAKE_COMMAND || "!взболтать").trim().toLowerCase();
+const STATUS_COMMAND = (process.env.STATUS_COMMAND || "!сонечка").trim().toLowerCase();
 
 function requireEnv(name) {
   const v = process.env[name];
@@ -56,6 +58,11 @@ async function shakeMilk(user, amount) {
     headers: { "Content-Type": "application/json", "X-Bot-Secret": CATCH_SECRET },
     body: JSON.stringify({ action: "shake", user, amount }),
   });
+  return res.json();
+}
+
+async function getPetState() {
+  const res = await fetch(`${CATCH_API_URL}?action=state`);
   return res.json();
 }
 
@@ -150,6 +157,23 @@ client.on("message", async (channel, tags, message, self) => {
       await client.say(channel, `@${displayName}, у тебя ${formatLiters(result.liters)} л молочка 🥛`);
     } catch (e) {
       console.error("balance request failed", e);
+    }
+    return;
+  }
+
+  if (text === STATUS_COMMAND) {
+    try {
+      const state = await getPetState();
+      if (state.at === null || state.at === undefined) {
+        await client.say(channel, "Сонечка пока молчит — виджет ещё не выходил на связь 🐐");
+        return;
+      }
+      await client.say(
+        channel,
+        `Сонечка: 💛 счастье ${Math.round(state.happiness)}% 🍽 сытость ${Math.round(state.fullness)}% 🥛 молоко ${Math.round(state.milkGauge)}%`
+      );
+    } catch (e) {
+      console.error("status request failed", e);
     }
     return;
   }
