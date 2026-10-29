@@ -147,6 +147,12 @@
   #statusDot.err{ background:#e53935; }
 
   /* ---------- gear / settings ---------- */
+  /* fully invisible hotspot — click it in OBS Interact mode to open settings
+     without ever having to type &edit=1 into the source URL */
+  #secretCorner{
+    position:absolute; top:0; left:0; width:34px; height:34px; z-index:60;
+    cursor:default; background:transparent;
+  }
   #gearBtn{
     display:none; /* hidden unless the page URL has &edit=1, so it never shows up on stream */
     position:absolute; right:10px; bottom:10px; width:34px; height:34px; border-radius:50%;
@@ -259,6 +265,7 @@
     <div id="winBanner"></div>
   </div>
 
+  <div id="secretCorner"></div>
   <button id="gearBtn" title="Настройки">⚙</button>
 
   <div id="settingsPanel">
@@ -444,6 +451,7 @@
   const winBanner = document.getElementById("winBanner");
   const statusDot = document.getElementById("statusDot");
   const gearBtn = document.getElementById("gearBtn");
+  const secretCorner = document.getElementById("secretCorner");
   const settingsPanel = document.getElementById("settingsPanel");
 
   const cfgClientId = document.getElementById("cfgClientId");
@@ -599,11 +607,13 @@
   }
 
   // ---------- settings panel open/close ----------
-  gearBtn.addEventListener("click", () => {
+  function toggleSettingsPanel(){
     settingsPanel.classList.toggle("open");
     if(settingsPanel.classList.contains("open")) renderSettingsForm();
     ensureAudio(); // a click is a user gesture — unlocks autoplay for later automatic spins
-  });
+  }
+  gearBtn.addEventListener("click", toggleSettingsPanel);
+  secretCorner.addEventListener("click", toggleSettingsPanel);
 
   function renderSettingsForm(){
     cfgClientId.value = cfg.clientId || "";
