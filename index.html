@@ -268,6 +268,8 @@
       <input type="text" id="cfgClientId" placeholder="например 12345">
       <label>Redirect URI — впишите этот же адрес в настройках приложения на DonationAlerts</label>
       <input type="text" id="redirectUriShow" readonly>
+      <label>Адрес прокси (обходит запрет CORS у DonationAlerts, без него живые донаты не дойдут)</label>
+      <input type="text" id="cfgProxyUrl" placeholder="например https://da-roulette.vercel.app">
       <div class="row" style="margin-top:8px;">
         <button class="primary" id="loginBtn">Войти через DonationAlerts</button>
         <button class="danger" id="logoutBtn">Выйти</button>
@@ -388,6 +390,7 @@
   function defaultConfig(){
     return {
       clientId: "",
+      proxyUrl: "",
       accessToken: "",
       tokenExpiresAt: 0,
       userId: null,
@@ -445,6 +448,7 @@
 
   const cfgClientId = document.getElementById("cfgClientId");
   const redirectUriShow = document.getElementById("redirectUriShow");
+  const cfgProxyUrl = document.getElementById("cfgProxyUrl");
   const loginBtn = document.getElementById("loginBtn");
   const logoutBtn = document.getElementById("logoutBtn");
   const authStatus = document.getElementById("authStatus");
@@ -603,6 +607,7 @@
 
   function renderSettingsForm(){
     cfgClientId.value = cfg.clientId || "";
+    cfgProxyUrl.value = cfg.proxyUrl || "";
     cfgProgressTitle.value = cfg.progressTitle;
     cfgGoal.value = cfg.goal;
     cfgCurrency.value = cfg.currency;
@@ -778,6 +783,7 @@
   });
 
   cfgClientId.addEventListener("change", () => { cfg.clientId = cfgClientId.value.trim(); saveConfig(); });
+  cfgProxyUrl.addEventListener("change", () => { cfg.proxyUrl = cfgProxyUrl.value.trim().replace(/\/$/, ""); saveConfig(); });
   cfgProgressTitle.addEventListener("input", () => { cfg.progressTitle = cfgProgressTitle.value || "ДО РУЛЕТКИ"; saveConfig(); applyTitles(); });
   cfgGoal.addEventListener("change", () => { cfg.goal = Math.max(1, Number(cfgGoal.value)||1000); saveConfig(); updateProgressUI(); });
   cfgCurrency.addEventListener("change", () => { cfg.currency = cfgCurrency.value || "₽"; saveConfig(); updateProgressUI(); });
@@ -1056,12 +1062,21 @@
     statusDot.className = level;
   }
 
+  // DonationAlerts' API doesn't send CORS headers, so a widget hosted on another
+  // origin (GitHub Pages) can't call it directly from the browser — route through
+  // the small relay in /api/da-proxy.js (deployed separately, e.g. on Vercel).
+  function daApiUrl(path){
+    if(cfg.proxyUrl) return `${cfg.proxyUrl}/api/da-proxy?path=${encodeURIComponent(path)}`;
+    return `https://www.donationalerts.com/api/v1/${path}`;
+  }
+
   async function connectRealtime(){
     if(!cfg.accessToken){ setStatus("err"); return; }
     if(cfg.tokenExpiresAt && cfg.tokenExpiresAt < Date.now()){ setStatus("err"); return; }
+    if(!cfg.proxyUrl){ console.warn("DA proxy URL not set — live donations will fail due to CORS"); }
     setStatus("warn");
     try{
-      const userResp = await fetch("https://www.donationalerts.com/api/v1/user/oauth", {
+      const userResp = await fetch(daApiUrl("user/oauth"), {
         headers: { Authorization: "Bearer " + cfg.accessToken }
       });
       if(!userResp.ok) throw new Error("user/oauth " + userResp.status);
@@ -1094,7 +1109,7 @@
       if(data.result && data.result.client && !clientId){
         clientId = data.result.client;
         try{
-          const subResp = await fetch("https://www.donationalerts.com/api/v1/centrifuge/subscribe", {
+          const subResp = await fetch(daApiUrl("centrifuge/subscribe"), {
             method:"POST",
             headers:{ Authorization:"Bearer "+cfg.accessToken, "Content-Type":"application/json" },
             body: JSON.stringify({ channels:["$alerts:donation_"+userId], client: clientId })
