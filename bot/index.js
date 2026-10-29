@@ -58,6 +58,9 @@ client.on("message", async (channel, tags, message, self) => {
   if (self) return;
   const text = message.trim().toLowerCase();
   const login = (tags.username || "").toLowerCase();
+  // временный диагностический лог — покажет в Render Logs всё, что реально
+  // приходит от Twitch, и с чем оно сравнивается
+  console.log("msg:", JSON.stringify(text), "from:", login, "matchesCatch:", text === CATCH_COMMAND, "catchCmd:", JSON.stringify(CATCH_COMMAND));
   if (!login) return;
 
   if (text === CATCH_COMMAND) {
