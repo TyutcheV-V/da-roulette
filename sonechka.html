@@ -381,6 +381,11 @@
       <div><label>Счастье за дойку, минус (при макс. донате)</label><input type="number" id="cfgMilkHappinessCost" value="10" min="0"></div>
       <div><label>Сытость за дойку, минус (при макс. донате)</label><input type="number" id="cfgMilkFullnessCost" value="10" min="0"></div>
     </div>
+    <div class="muted">Кешбек донатеру на баланс молочка (!молочко/!просьба) за сам факт доната на дойку — отдельно от того, что он задонатил, и от того, что поймают в чате при заливке.</div>
+    <div class="row">
+      <div><label>Кешбек, л (при мин. донате)</label><input type="number" id="cfgMilkCashbackMin" value="0.1" min="0" step="0.1"></div>
+      <div><label>Кешбек, л (при макс. донате)</label><input type="number" id="cfgMilkCashbackMax" value="0.5" min="0" step="0.1"></div>
+    </div>
 
     <h3>Голод и грусть без донатов</h3>
     <div class="muted">Падает плавно и постепенно, не рывками. Например, 6.25 — это полное похудение/погрустнение из максимума за 16 часов (100 / 16 = 6.25).</div>
@@ -551,6 +556,8 @@
       milkGaugeFillPerDonation: 100, // насколько шкала дойки заполняется за один макс. донат
       milkHappinessCost: 10,
       milkFullnessCost: 10,
+      milkCashbackMin: 0.1, // литров на баланс донатеру за сам донат на дойку, при сумме = donationMinAmount
+      milkCashbackMax: 0.5, // то же самое, при сумме = donationMaxAmount (и выше)
       decayPerHour: 6.25,        // плавное падение счастья/сытости, очков в час (100/16ч = полностью за 16 часов)
       overflowSlowMinutes: 3,    // минут замедленного падения за каждое очко "перелива" (донат на уже полную полоску)
       overflowSlowFactor: 0.4,   // во время замедления падение идёт с этой долей скорости (0.4 = на 60% медленнее)
@@ -692,6 +699,8 @@
   const cfgMilkGaugeFill = document.getElementById("cfgMilkGaugeFill");
   const cfgMilkHappinessCost = document.getElementById("cfgMilkHappinessCost");
   const cfgMilkFullnessCost = document.getElementById("cfgMilkFullnessCost");
+  const cfgMilkCashbackMin = document.getElementById("cfgMilkCashbackMin");
+  const cfgMilkCashbackMax = document.getElementById("cfgMilkCashbackMax");
   const cfgDecayPerHour = document.getElementById("cfgDecayPerHour");
   const cfgOverflowSlowMinutes = document.getElementById("cfgOverflowSlowMinutes");
   const cfgOverflowSlowFactor = document.getElementById("cfgOverflowSlowFactor");
@@ -791,6 +800,8 @@
     cfgMilkGaugeFill.value = cfg.milkGaugeFillPerDonation;
     cfgMilkHappinessCost.value = cfg.milkHappinessCost;
     cfgMilkFullnessCost.value = cfg.milkFullnessCost;
+    cfgMilkCashbackMin.value = cfg.milkCashbackMin;
+    cfgMilkCashbackMax.value = cfg.milkCashbackMax;
     cfgDecayPerHour.value = cfg.decayPerHour;
     cfgOverflowSlowMinutes.value = cfg.overflowSlowMinutes;
     cfgOverflowSlowFactor.value = cfg.overflowSlowFactor;
@@ -952,6 +963,8 @@
   cfgMilkGaugeFill.addEventListener("change", () => { cfg.milkGaugeFillPerDonation = Number(cfgMilkGaugeFill.value)||100; saveConfig(); });
   cfgMilkHappinessCost.addEventListener("change", () => { cfg.milkHappinessCost = Number(cfgMilkHappinessCost.value)||0; saveConfig(); });
   cfgMilkFullnessCost.addEventListener("change", () => { cfg.milkFullnessCost = Number(cfgMilkFullnessCost.value)||0; saveConfig(); });
+  cfgMilkCashbackMin.addEventListener("change", () => { cfg.milkCashbackMin = Math.max(0, Number(cfgMilkCashbackMin.value)||0); saveConfig(); });
+  cfgMilkCashbackMax.addEventListener("change", () => { cfg.milkCashbackMax = Math.max(0, Number(cfgMilkCashbackMax.value)||0); saveConfig(); });
   cfgDecayPerHour.addEventListener("change", () => { cfg.decayPerHour = Number(cfgDecayPerHour.value)||0; saveConfig(); });
   cfgOverflowSlowMinutes.addEventListener("change", () => { cfg.overflowSlowMinutes = Number(cfgOverflowSlowMinutes.value)||0; saveConfig(); });
   cfgOverflowSlowFactor.addEventListener("change", () => { cfg.overflowSlowFactor = Number(cfgOverflowSlowFactor.value)||0; saveConfig(); });
@@ -1303,6 +1316,16 @@
       cfg.fullness = Math.max(0, cfg.fullness - Number(cfg.milkFullnessCost||0)*strength);
       popupNear(petGaugeBar, "+" + Math.round(gaugeFill));
       postStat("donor", donorName, amount);
+      // кешбек на баланс молочка (!молочко/!просьба) за сам факт доната на дойку —
+      // линейно от minAmount до maxAmount, независимо от шкалы/бидонов выше
+      const lo = Number(cfg.donationMinAmount||50), hi = Math.max(lo+1, Number(cfg.donationMaxAmount||1000));
+      const cashbackFrac = Math.max(0, Math.min(1, (amount-lo)/(hi-lo)));
+      const cashbackMin = Number(cfg.milkCashbackMin||0), cashbackMax = Number(cfg.milkCashbackMax||0);
+      const cashback = cashbackMin + cashbackFrac*(cashbackMax-cashbackMin);
+      // баланс молочка ключуется по твич-логину в нижнем регистре (так его
+      // ищет бот на !молочко/!просьба) — приводим донатера к тому же виду,
+      // чтобы кешбек нашёлся, если он донатил и писал в чат одним именем
+      if(cashback > 0) postStat("drinker", String(donorName).toLowerCase().trim(), Math.round(cashback*10)/10);
       playFile("sounds/milk.mp3");
       let gainedCans = 0;
       while(cfg.milkGauge >= 100){
