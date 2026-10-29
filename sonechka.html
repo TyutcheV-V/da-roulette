@@ -246,10 +246,10 @@
 
     <h3>Заливка молоком</h3>
     <div class="row">
-      <div><label>Бидонов до заливки</label><input type="number" id="cfgFloodThreshold" value="10" min="1"></div>
+      <div><label>Доек до заливки</label><input type="number" id="cfgFloodThreshold" value="10" min="1"></div>
       <div><label>Держать на экране, сек</label><input type="number" id="cfgFloodHold" value="6" min="1"></div>
     </div>
-    <label><input type="checkbox" id="cfgFloodCarryOver" style="width:auto;" checked> переносить остаток бидонов на новый круг</label>
+    <label><input type="checkbox" id="cfgFloodCarryOver" style="width:auto;" checked> следующий круг стартует сразу с 1 дойки (не с нуля)</label>
     <label>Текст на весь экран</label>
     <input type="text" id="cfgFloodText" value="СОНЕЧКА ЗАЛИВАЕТ ВАС МОЛОЧКОМ ОТКРЫВАЙТЕ РОТИК">
 
@@ -677,14 +677,17 @@
   }
 
   // ---------- sprite (images/sonechka-1..5.png, falls back to an emoji if missing) ----------
-  function moodTier(){
-    const avg = (cfg.happiness + cfg.fullness) / 2;
-    if(avg < 20) return 1;
-    if(avg < 40) return 2;
-    if(avg < 60) return 3;
-    if(avg < 80) return 4;
-    return 5;
+  // 6 independent states: weight (худая/нормальная/накормленная) × mood (грустная/счастливая)
+  function weightTier(){
+    if(cfg.fullness < 35) return "thin";
+    if(cfg.fullness < 70) return "normal";
+    return "fed";
   }
+  function moodState(){
+    return cfg.happiness < 50 ? "sad" : "happy";
+  }
+  const WEIGHT_LABELS = { thin:"худая", normal:"нормальная", fed:"накормленная" };
+  const MOOD_LABELS = { sad:"грустная", happy:"счастливая" };
   petSpriteImg.addEventListener("error", () => {
     petSpriteImg.style.display = "none";
     petSpriteFallback.style.display = "flex";
@@ -692,7 +695,9 @@
   function updateSprite(){
     petSpriteFallback.style.display = "none";
     petSpriteImg.style.display = "block";
-    petSpriteImg.src = `images/sonechka-${moodTier()}.png`;
+    const w = weightTier(), m = moodState();
+    petSpriteImg.alt = `Сонечка: ${WEIGHT_LABELS[w]}, ${MOOD_LABELS[m]}`;
+    petSpriteImg.src = `images/sonechka-${w}-${m}.png`;
   }
 
   function updatePetUI(){
@@ -782,7 +787,7 @@
       if(yieldAmount <= 0){
         showBubble(`Сонечка слишком устала для молока... покормите и погладьте её! 😿`);
       } else {
-        cfg.milkCans += yieldAmount;
+        cfg.milkCans += 1; // счётчик доек до заливки — считаем именно дойки, не литры
         startCatchRound(yieldAmount, donorName);
         if(cfg.milkCans >= cfg.floodThreshold) triggerFlood();
       }
@@ -792,7 +797,9 @@
   }
 
   function triggerFlood(){
-    cfg.milkCans = cfg.floodCarryOver ? Math.max(0, cfg.milkCans - cfg.floodThreshold) : 0;
+    // the counter is a count of milkings, not litres, so there's no "remainder" to
+    // carry over — floodCarryOver instead gives the next round a +1 head start
+    cfg.milkCans = cfg.floodCarryOver ? 1 : 0;
     saveConfig();
     floodText.textContent = cfg.floodText;
     floodOverlay.classList.add("show");
