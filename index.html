@@ -1151,9 +1151,11 @@
   }
 
   function handleDonationEvent(payload){
-    // payload may be wrapped as {info:{...}} (subscribe ack) or the actual alert
-    const alert = payload.alert || payload;
-    const amount = Number(alert.amount);
+    // real shape seen from Centrifugo: {seq, data:{amount, currency, ...}}.
+    // The subscribe-confirmation push ({info:{user,client}}) has neither
+    // .data nor .alert, so it safely falls through with amount = NaN below.
+    const alert = (payload && payload.data) || (payload && payload.alert) || payload;
+    const amount = Number(alert && alert.amount);
     if(!amount || Number.isNaN(amount)) return;
     addDonation(amount);
   }
