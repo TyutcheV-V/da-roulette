@@ -433,6 +433,7 @@
       showStatus: false,
       progress: 0,
       pendingSpinId: null,
+      goalCrossedAt: null,
       categories: DEFAULT_CATEGORIES.map(c => Object.assign({}, c)),
       rarityWeights: defaultRarityWeights()
     };
@@ -922,6 +923,9 @@
   function addDonation(amount){
     if(cfg.progress >= cfg.goal) return; // already awaiting / running a spin
     cfg.progress += amount;
+    if(cfg.progress >= cfg.goal && !cfg.goalCrossedAt){
+      cfg.goalCrossedAt = Date.now(); // lets self-heal notice if the 400ms trigger below never lands
+    }
     saveConfig();
     updateProgressUI();
     if(cfg.progress >= cfg.goal){
@@ -937,6 +941,7 @@
     if(hasProgressUI) progressWrap.classList.add("hidden");
     const id = Date.now() + "_" + Math.random().toString(36).slice(2);
     cfg.pendingSpinId = id;
+    cfg.goalCrossedAt = null;
     saveConfig();
     writeKey(SPIN_TRIGGER_KEY, id);
     clearTimeout(spinSafetyTimer);
@@ -1212,8 +1217,22 @@
   // debugging): without this, addDonation()'s guard (progress >= goal) stays
   // tripped forever and new donations are silently ignored. Any real roulette
   // widget that later sends the matching ack just no-ops against it (harmless).
+  // A reload can also land in the narrow gap between a donation crossing the
+  // goal and triggerSpin() actually persisting pendingSpinId — in that case
+  // the donor is still owed a spin, so fire one instead of staying stuck.
   if(hasProgressUI && cfg.pendingSpinId){
     resumeAfterSpin(cfg.pendingSpinId);
+  } else if(hasProgressUI && cfg.progress >= cfg.goal){
+    triggerSpin();
+  }
+  // belt-and-suspenders: catches the same stuck state without needing a reload
+  // (e.g. two widget instances racing on the same config in different OBS sources).
+  if(hasProgressUI){
+    setInterval(() => {
+      if(cfg.progress >= cfg.goal && !cfg.pendingSpinId && cfg.goalCrossedAt && (Date.now() - cfg.goalCrossedAt > 3000)){
+        triggerSpin();
+      }
+    }, 2000);
   }
   updateProgressUI();
   renderSettingsForm();
