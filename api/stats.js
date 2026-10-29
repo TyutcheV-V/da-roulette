@@ -46,11 +46,16 @@ module.exports = async function handler(req, res) {
 
   try {
     if (req.method === "GET") {
-      const [donors, drinkers] = await Promise.all([
+      const [donors, drinkers, requestsRaw] = await Promise.all([
         redis("ZREVRANGE", "sonechka:donors", 0, 19, "WITHSCORES"),
         redis("ZREVRANGE", "sonechka:drinkers", 0, 19, "WITHSCORES"),
+        redis("LRANGE", "sonechka:requests:log", -50, -1),
       ]);
-      res.status(200).json({ donors: pairUp(donors), drinkers: pairUp(drinkers) });
+      const requests = (requestsRaw || [])
+        .map((s) => { try { return JSON.parse(s); } catch (e) { return null; } })
+        .filter(Boolean)
+        .reverse(); // новые сверху
+      res.status(200).json({ donors: pairUp(donors), drinkers: pairUp(drinkers), requests });
       return;
     }
     if (req.method === "POST") {

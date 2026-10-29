@@ -14,6 +14,8 @@ const ROUND_KEY = "sonechka:round:remaining";
 const CATCHES_KEY = "sonechka:round:catches";
 const BALANCE_KEY = "sonechka:drinkers"; // reused: lifetime milk balance per Twitch login
 const REQUESTS_KEY = "sonechka:requests"; // queue of paid "!просьба" asks, drained by the widget
+const REQUESTS_LOG_KEY = "sonechka:requests:log"; // same asks, kept permanently for the dashboard (api/stats.js reads this)
+const REQUESTS_LOG_MAX = 200;
 const REQUEST_TEXT_MAX_LEN = 150;
 
 function sanitizeRequestText(text) {
@@ -162,8 +164,11 @@ module.exports = async function handler(req, res) {
           res.status(200).json({ ok: true, spent: false, balance: afterSpend + cost });
           return;
         }
-        await redis("RPUSH", REQUESTS_KEY, JSON.stringify({ user, text }));
+        const entry = JSON.stringify({ user, text, cost, at: Date.now() });
+        await redis("RPUSH", REQUESTS_KEY, entry);
         await redis("LTRIM", REQUESTS_KEY, -50, -1); // не копим бесконечно, если виджет долго офлайн
+        await redis("RPUSH", REQUESTS_LOG_KEY, entry); // отдельная копия — насовсем, для дашборда (api/stats.js)
+        await redis("LTRIM", REQUESTS_LOG_KEY, -REQUESTS_LOG_MAX, -1);
         res.status(200).json({ ok: true, spent: true, balance: afterSpend });
         return;
       }
