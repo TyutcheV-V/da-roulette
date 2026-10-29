@@ -62,7 +62,21 @@
   .petBarFill.happy{ background:linear-gradient(90deg,#ff5ec4,#ffd24d); }
   .petBarFill.full{ background:linear-gradient(90deg,#4caf50,#8bffb0); }
 
+  .petBarFill.gauge{ background:linear-gradient(90deg,#2e9eff,#8bffe0); }
+
   #petMilkCount{ margin-top:6px; font-size:13px; font-weight:700; color:#bfe0ff; }
+
+  /* subtle idle "breathing" so she doesn't look frozen */
+  #petSpriteWrap{ animation: petBreathe 3.2s ease-in-out infinite; }
+  @keyframes petBreathe{ 0%,100%{ transform:scale(1); } 50%{ transform:scale(1.035); } }
+
+  /* shake right before the flood, while she's "about to burst" */
+  #petCard.shaking{ animation: petShake .32s ease-in-out infinite; }
+  @keyframes petShake{
+    0%,100%{ transform:translate(-50%,-50%) rotate(0deg); }
+    25%{ transform:translate(calc(-50% - 3px),-50%) rotate(-2deg); }
+    75%{ transform:translate(calc(-50% + 3px),-50%) rotate(2deg); }
+  }
 
   /* ---------- speech bubble (now a child of #petCard, so it follows it when dragged) ---------- */
   #petBubble{
@@ -99,6 +113,56 @@
     font-size:40px; font-weight:900; color:#1a1030; text-align:center; max-width:90%;
     text-shadow:0 2px 0 #fff, 0 4px 14px rgba(0,0,0,.25); line-height:1.2;
   }
+  #dropLayer{ position:absolute; inset:0; overflow:hidden; pointer-events:none; }
+  /* falling milk droplets layered over the flood wash */
+  .milkDrop{
+    position:absolute; top:-40px; width:14px; height:22px; border-radius:50% 50% 50% 0;
+    background:radial-gradient(circle at 35% 30%, #fff, #eaf2ff 60%, #cfe3ff);
+    opacity:.9; animation: milkFall linear forwards;
+  }
+  @keyframes milkFall{ to{ transform: translateY(115vh) rotate(25deg); opacity:.3; } }
+
+  /* "about to burst" warning banner */
+  #burstWarning{
+    position:absolute; left:50%; top:30%; transform:translateX(-50%) translateY(-10px);
+    font-size:34px; font-weight:900; color:#ff4d4d; text-align:center; max-width:90%;
+    text-shadow:0 0 14px rgba(255,0,0,.7), 0 2px 4px rgba(0,0,0,.8);
+    opacity:0; pointer-events:none; transition:opacity .25s ease, transform .25s ease;
+  }
+  #burstWarning.show{ opacity:1; transform:translateX(-50%) translateY(0); animation: burstPulse .5s ease-in-out infinite; }
+  @keyframes burstPulse{ 0%,100%{ filter:brightness(1); } 50%{ filter:brightness(1.6); } }
+
+  /* who-caught-the-milk announcement */
+  #catchWinnersBanner{
+    position:absolute; left:50%; top:45%; transform:translateX(-50%) translateY(10px);
+    background:rgba(10,20,40,.9); border:2px solid #8bffe0; border-radius:16px;
+    padding:16px 26px; font-size:22px; font-weight:800; text-align:center; max-width:85%;
+    opacity:0; pointer-events:none; transition:opacity .3s ease, transform .3s ease;
+    box-shadow:0 0 30px rgba(139,255,224,.5);
+  }
+  #catchWinnersBanner.show{ opacity:1; transform:translateX(-50%) translateY(0); }
+
+  /* random fullscreen mood popup ("Я ГОЛОДНАЯ" etc.) */
+  #moodPopup{
+    position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center;
+    gap:14px; background:rgba(5,5,10,.55); opacity:0; pointer-events:none; transition:opacity .35s ease;
+  }
+  #moodPopup.show{ opacity:1; }
+  #moodPopupImg{ max-width:50%; max-height:55%; display:none; }
+  #moodPopupFallback{ font-size:140px; line-height:1; display:none; }
+  #moodPopupText{
+    font-size:36px; font-weight:900; color:#fff; text-align:center; max-width:80%;
+    text-shadow:0 0 16px rgba(255,80,80,.8), 0 3px 6px rgba(0,0,0,.8);
+  }
+
+  /* idle hint bubble above the card, cycling through tips */
+  #hintBubble{
+    position:absolute; left:50%; transform:translateX(-50%) translateY(6px); bottom:100%; margin-bottom:10px;
+    width:240px; padding:8px 12px; border-radius:12px; background:rgba(40,26,10,.95); border:1px solid #7a5a2a;
+    font-size:12px; font-weight:600; text-align:center; color:#ffe6b0;
+    opacity:0; pointer-events:none; transition:opacity .4s ease, transform .4s ease;
+  }
+  #hintBubble.show{ opacity:1; transform:translateX(-50%) translateY(0); }
 
   /* ---------- gear / settings (same pattern as the roulette widget) ---------- */
   #secretCorner{ position:absolute; top:0; left:0; width:34px; height:34px; z-index:60; background:transparent; }
@@ -153,11 +217,19 @@
 </head>
 <body>
 <div id="stage">
-  <div id="floodOverlay"><div id="floodText"></div></div>
+  <div id="floodOverlay"><div id="floodText"></div><div id="dropLayer"></div></div>
   <div id="catchBanner">🥛 Лови команду <span id="catchCmdLabel">!ловлю</span>!</div>
+  <div id="burstWarning">СОНЕЧКА ЩАС ЛОПНЕТ</div>
+  <div id="catchWinnersBanner"></div>
+  <div id="moodPopup">
+    <img id="moodPopupImg" alt="Сонечка">
+    <div id="moodPopupFallback">😠🐐</div>
+    <div id="moodPopupText"></div>
+  </div>
 
   <div id="petCard">
     <div id="petBubble"></div>
+    <div id="hintBubble"></div>
     <div id="petSpriteWrap">
       <img id="petSpriteImg" alt="Сонечка">
       <div id="petSpriteFallback">🐐</div>
@@ -165,6 +237,7 @@
     <div id="petName">Сонечка</div>
     <div class="petBarRow"><span class="petBarLabel">💛</span><div class="petBarTrack"><div id="petHappyBar" class="petBarFill happy"></div></div></div>
     <div class="petBarRow"><span class="petBarLabel">🍽</span><div class="petBarTrack"><div id="petFullBar" class="petBarFill full"></div></div></div>
+    <div class="petBarRow"><span class="petBarLabel">🧪</span><div class="petBarTrack"><div id="petGaugeBar" class="petBarFill gauge"></div></div></div>
     <div id="petMilkCount">🥛 0 / 10</div>
   </div>
 
@@ -217,7 +290,11 @@
     <input type="range" id="cfgSoundVolume" min="0" max="100" value="80">
 
     <h3>Действия по донату</h3>
-    <div class="muted">Сонечка реагирует, если в сообщении доната есть одно из ключевых слов (через запятую) И сумма не меньше порога.</div>
+    <div class="muted">Сонечка реагирует, если в сообщении доната есть одно из ключевых слов (через запятую) и сумма не меньше общей минималки ниже. Чем больше донат относительно минималки — тем сильнее эффект (больше сытости/счастья/молока), без привязки к конкретной сумме на каждое действие.</div>
+    <div class="row" style="margin-top:6px;">
+      <div><label>Минимальная сумма доната, чтобы она среагировала</label><input type="number" id="cfgDonationMin" value="100" min="1"></div>
+      <div><label>Потолок усиления (во сколько раз максимум)</label><input type="number" id="cfgStrengthCap" value="20" min="1"></div>
+    </div>
     <div id="actionsGrid"></div>
     <button class="smallBtn" id="addActionBtn" style="margin-top:8px;">+ добавить действие</button>
 
@@ -232,28 +309,66 @@
     </div>
     <label>Множитель молока за уровень роста (0.5 = +50% за уровень)</label>
     <input type="number" id="cfgMilkGrowthFactor" value="0.5" step="0.1" min="0">
-    <div class="muted" style="margin-top:6px;">Молоко берётся из её счастья и сытости — чем она устала и голоднее, тем меньше даёт. Если совсем истощена — молока не будет, пока не покормят.</div>
+    <div class="muted" style="margin-top:6px;">Кормление и поглаживание подпитывают отдельную шкалу дойки (🧪 на карточке) — молоко берётся из неё, а не из счастья/сытости напрямую, так что дойка больше не роняет её в ноль. Чем шкала полнее — тем больше молока за раз.</div>
     <div class="row">
-      <div><label>Счастье за дойку (минус)</label><input type="number" id="cfgMilkHappinessCost" value="10" min="0"></div>
-      <div><label>Сытость за дойку (минус)</label><input type="number" id="cfgMilkFullnessCost" value="10" min="0"></div>
+      <div><label>Доля прироста, уходящая в шкалу дойки</label><input type="number" id="cfgGaugeFill" value="0.6" step="0.1" min="0" max="1"></div>
+      <div><label>Трата шкалы за одну дойку</label><input type="number" id="cfgGaugeDrain" value="35" min="0"></div>
+    </div>
+    <label>Бонус в шкалу, если кормление/ласка превысили 100%</label>
+    <input type="number" id="cfgGaugeOverflow" value="1" step="0.1" min="0">
+    <div class="muted" style="margin-top:6px;">Необязательный доп. расход счастья/сытости за дойку (0 — не тратить вообще)</div>
+    <div class="row">
+      <div><label>Счастье за дойку (минус)</label><input type="number" id="cfgMilkHappinessCost" value="0" min="0"></div>
+      <div><label>Сытость за дойку (минус)</label><input type="number" id="cfgMilkFullnessCost" value="0" min="0"></div>
     </div>
 
     <h3>Голод и грусть без донатов</h3>
-    <div class="row">
-      <div><label>Проверка раз в, часов</label><input type="number" id="cfgDecayHours" value="6" min="1"></div>
-      <div><label>Насколько падает</label><input type="number" id="cfgDecayStep" value="10" min="1"></div>
-    </div>
+    <div class="muted">Падает плавно и постепенно, не рывками.</div>
+    <label>Очков счастья и сытости теряется в час</label>
+    <input type="number" id="cfgDecayPerHour" value="6" min="0" step="0.5">
+
+    <h3>Фразы Сонечки</h3>
+    <label>При кормлении (каждая фраза с новой строки, выбирается случайно)</label>
+    <textarea id="cfgFeedPhrases">Ой как вкусно!
+Спасибо, объедение!
+М-м-м, то что нужно!
+Теперь я сытая!</textarea>
+    <label>При поглаживании (тоже каждая фраза с новой строки)</label>
+    <textarea id="cfgPetPhrases">Хи-хи-хи!
+Очень приятно!
+Мне так хорошо!
+Ещё, ещё!</textarea>
 
     <h3>Заливка молоком</h3>
-    <div class="muted">Ловля молока чатом (команда «!ловлю») происходит один раз — именно в момент большой заливки, не на каждой дойке.</div>
+    <div class="muted">Ловля молока чатом (команда «!ловлю») происходит один раз — именно в момент большой заливки, не на каждой дойке. Поймать может столько человек, сколько было доек в этом цикле (первые по очереди в чате).</div>
     <div class="row" style="margin-top:6px;">
       <div><label>Доек до заливки (сейчас)</label><input type="number" id="cfgFloodThreshold" value="10" min="1"></div>
       <div><label>Держать на экране, сек</label><input type="number" id="cfgFloodHold" value="6" min="1"></div>
     </div>
     <label>Насколько растёт порог после каждой заливки (10 → 11 → 12...)</label>
     <input type="number" id="cfgFloodIncrement" value="1" min="0">
-    <label>Текст на весь экран</label>
+    <label>Текст на весь экран при заливке</label>
     <input type="text" id="cfgFloodText" value="СОНЕЧКА ЗАЛИВАЕТ ВАС МОЛОЧКОМ ОТКРЫВАЙТЕ РОТИК">
+    <label>Сколько секунд трясётся с предупреждением перед заливкой</label>
+    <input type="number" id="cfgFloodWarning" value="10" min="0">
+    <label>Текст предупреждения</label>
+    <input type="text" id="cfgBurstText" value="СОНЕЧКА ЩАС ЛОПНЕТ">
+
+    <h3>Случайные капризы на весь экран</h3>
+    <div class="muted">Время от времени она сама выскакивает на весь экран со злым лицом и случайной фразой.</div>
+    <div class="row">
+      <div><label>Не реже чем раз в, минут</label><input type="number" id="cfgPopupMin" value="15" min="1"></div>
+      <div><label>Не чаще чем раз в, минут</label><input type="number" id="cfgPopupMax" value="45" min="1"></div>
+    </div>
+    <label>Фразы капризов (каждая с новой строки)</label>
+    <textarea id="cfgPopupPhrases">Я ГОЛОДНАЯ
+МНЕ ГРУСТНО
+ПОДОИ МЕНЯ Я УЖЕ НЕ МОГУ</textarea>
+    <label>Как часто крутить подсказку над ней («покорми меня...»), сек</label>
+    <input type="number" id="cfgHintSeconds" value="25" min="5">
+    <div class="row" style="margin-top:6px;">
+      <button id="testPopupBtn">Показать каприз сейчас</button>
+    </div>
 
     <h3>Статистика</h3>
     <div class="row">
@@ -298,9 +413,9 @@
   const editMode = urlParams.get("edit") === "1";
 
   const DEFAULT_ACTIONS = [
-    {id:1, name:"Подоить", effect:"milk", keywords:"подоить, подои, подои сонечку, молоко", minAmount:500, enabled:true},
-    {id:2, name:"Покормить", effect:"feed", keywords:"покормить, корм, покорми", minAmount:200, enabled:true},
-    {id:3, name:"Погладить", effect:"pet", keywords:"погладить, гладить, глажу, ласка", minAmount:100, enabled:true}
+    {id:1, name:"Подоить", effect:"milk", keywords:"подоить, подои, подои сонечку, молоко", enabled:true},
+    {id:2, name:"Покормить", effect:"feed", keywords:"покормить, корм, покорми", enabled:true},
+    {id:3, name:"Погладить", effect:"pet", keywords:"погладить, гладить, глажу, ласка", enabled:true}
   ];
 
   function defaultConfig(){
@@ -308,6 +423,8 @@
       posX: 88,
       posY: 85,
       twitchChannel: "",
+      donationMinAmount: 100,
+      strengthCap: 20,
       catchCommand: "!ловлю",
       catchWindowSeconds: 10,
       muteSound: false,
@@ -318,17 +435,28 @@
       petHappinessStep: 20,
       milkBaseYield: 1,
       milkGrowthFactor: 0.5,
-      milkHappinessCost: 10,
-      milkFullnessCost: 10,
-      decayCheckHours: 6,
-      decayStep: 10,
+      milkHappinessCost: 0,
+      milkFullnessCost: 0,
+      gaugeFillFactor: 0.6,      // доля прироста сытости/счастья, уходящая в шкалу дойки
+      gaugeOverflowBonus: 1,     // сверх-норма (выше 100) идёт в шкалу доп. бонусом
+      milkGaugeDrainPerMilk: 35, // насколько шкала дойки тратится за одну дойку
+      decayPerHour: 6,           // плавное падение счастья/сытости, очков в час
       floodThreshold: 10,
       floodThresholdIncrement: 1, // 10 -> 11 -> 12 ... after each flood
+      floodWarningSeconds: 10,    // держим "ЩАС ЛОПНЕТ" перед самой заливкой
       floodHoldSeconds: 6,
       floodText: "СОНЕЧКА ЗАЛИВАЕТ ВАС МОЛОЧКОМ ОТКРЫВАЙТЕ РОТИК",
+      burstWarningText: "СОНЕЧКА ЩАС ЛОПНЕТ",
+      feedPhrases: "Ой как вкусно!\nСпасибо, объедение!\nМ-м-м, то что нужно!\nТеперь я сытая!",
+      petPhrases: "Хи-хи-хи!\nОчень приятно!\nМне так хорошо!\nЕщё, ещё!",
+      moodPopupPhrases: "Я ГОЛОДНАЯ\nМНЕ ГРУСТНО\nПОДОИ МЕНЯ Я УЖЕ НЕ МОГУ",
+      randomPopupMinMinutes: 15,
+      randomPopupMaxMinutes: 45,
+      hintRotationSeconds: 25,
       // runtime pet state, persisted alongside settings
       happiness: 70,
       fullness: 70,
+      milkGauge: 0,
       pendingMilkYield: 0,
       growth: 1,
       milkCans: 0,
@@ -382,8 +510,17 @@
   const petSpriteFallback = document.getElementById("petSpriteFallback");
   const petHappyBar = document.getElementById("petHappyBar");
   const petFullBar = document.getElementById("petFullBar");
+  const petGaugeBar = document.getElementById("petGaugeBar");
   const petMilkCount = document.getElementById("petMilkCount");
   const petBubble = document.getElementById("petBubble");
+  const hintBubble = document.getElementById("hintBubble");
+  const dropLayer = document.getElementById("dropLayer");
+  const burstWarning = document.getElementById("burstWarning");
+  const catchWinnersBanner = document.getElementById("catchWinnersBanner");
+  const moodPopup = document.getElementById("moodPopup");
+  const moodPopupImg = document.getElementById("moodPopupImg");
+  const moodPopupFallback = document.getElementById("moodPopupFallback");
+  const moodPopupText = document.getElementById("moodPopupText");
 
   const secretCorner = document.getElementById("secretCorner");
   const gearBtn = document.getElementById("gearBtn");
@@ -408,6 +545,8 @@
 
   const actionsGrid = document.getElementById("actionsGrid");
   const addActionBtn = document.getElementById("addActionBtn");
+  const cfgDonationMin = document.getElementById("cfgDonationMin");
+  const cfgStrengthCap = document.getElementById("cfgStrengthCap");
 
   const cfgFeedFullness = document.getElementById("cfgFeedFullness");
   const cfgFeedGrowth = document.getElementById("cfgFeedGrowth");
@@ -416,12 +555,23 @@
   const cfgMilkGrowthFactor = document.getElementById("cfgMilkGrowthFactor");
   const cfgMilkHappinessCost = document.getElementById("cfgMilkHappinessCost");
   const cfgMilkFullnessCost = document.getElementById("cfgMilkFullnessCost");
-  const cfgDecayHours = document.getElementById("cfgDecayHours");
-  const cfgDecayStep = document.getElementById("cfgDecayStep");
+  const cfgGaugeFill = document.getElementById("cfgGaugeFill");
+  const cfgGaugeDrain = document.getElementById("cfgGaugeDrain");
+  const cfgGaugeOverflow = document.getElementById("cfgGaugeOverflow");
+  const cfgDecayPerHour = document.getElementById("cfgDecayPerHour");
+  const cfgFeedPhrases = document.getElementById("cfgFeedPhrases");
+  const cfgPetPhrases = document.getElementById("cfgPetPhrases");
   const cfgFloodThreshold = document.getElementById("cfgFloodThreshold");
   const cfgFloodIncrement = document.getElementById("cfgFloodIncrement");
   const cfgFloodHold = document.getElementById("cfgFloodHold");
   const cfgFloodText = document.getElementById("cfgFloodText");
+  const cfgFloodWarning = document.getElementById("cfgFloodWarning");
+  const cfgBurstText = document.getElementById("cfgBurstText");
+  const cfgPopupMin = document.getElementById("cfgPopupMin");
+  const cfgPopupMax = document.getElementById("cfgPopupMax");
+  const cfgPopupPhrases = document.getElementById("cfgPopupPhrases");
+  const cfgHintSeconds = document.getElementById("cfgHintSeconds");
+  const testPopupBtn = document.getElementById("testPopupBtn");
 
   const refreshStatsBtn = document.getElementById("refreshStatsBtn");
   const resetPetBtn = document.getElementById("resetPetBtn");
@@ -474,6 +624,8 @@
     cfgTwitchChannel.value = cfg.twitchChannel || "";
     cfgCatchCommand.value = cfg.catchCommand;
     cfgCatchWindow.value = cfg.catchWindowSeconds;
+    cfgDonationMin.value = cfg.donationMinAmount;
+    cfgStrengthCap.value = cfg.strengthCap;
     cfgPosX.value = Math.round(cfg.posX);
     cfgPosY.value = Math.round(cfg.posY);
     cfgMuteSound.checked = !!cfg.muteSound;
@@ -485,12 +637,22 @@
     cfgMilkGrowthFactor.value = cfg.milkGrowthFactor;
     cfgMilkHappinessCost.value = cfg.milkHappinessCost;
     cfgMilkFullnessCost.value = cfg.milkFullnessCost;
-    cfgDecayHours.value = cfg.decayCheckHours;
-    cfgDecayStep.value = cfg.decayStep;
+    cfgGaugeFill.value = cfg.gaugeFillFactor;
+    cfgGaugeDrain.value = cfg.milkGaugeDrainPerMilk;
+    cfgGaugeOverflow.value = cfg.gaugeOverflowBonus;
+    cfgDecayPerHour.value = cfg.decayPerHour;
+    cfgFeedPhrases.value = cfg.feedPhrases;
+    cfgPetPhrases.value = cfg.petPhrases;
     cfgFloodThreshold.value = cfg.floodThreshold;
     cfgFloodHold.value = cfg.floodHoldSeconds;
     cfgFloodIncrement.value = cfg.floodThresholdIncrement;
     cfgFloodText.value = cfg.floodText;
+    cfgFloodWarning.value = cfg.floodWarningSeconds;
+    cfgBurstText.value = cfg.burstWarningText;
+    cfgPopupMin.value = cfg.randomPopupMinMinutes;
+    cfgPopupMax.value = cfg.randomPopupMaxMinutes;
+    cfgPopupPhrases.value = cfg.moodPopupPhrases;
+    cfgHintSeconds.value = cfg.hintRotationSeconds;
     renderAuthStatus();
     renderActions();
   }
@@ -525,7 +687,6 @@
             <option value="feed" ${a.effect==="feed"?"selected":""}>🌾 Кормление</option>
             <option value="pet" ${a.effect==="pet"?"selected":""}>💛 Поглаживание</option>
           </select>
-          <input type="number" data-idx="${idx}" data-field="minAmount" value="${a.minAmount}" min="0" placeholder="мин. сумма">
         </div>
         <input type="text" data-idx="${idx}" data-field="keywords" value="${escapeHtml(a.keywords)}" placeholder="ключевые слова через запятую">
       `;
@@ -538,8 +699,7 @@
     const idx = Number(t.dataset.idx);
     const field = t.dataset.field;
     if(field == null || Number.isNaN(idx)) return;
-    if(field === "minAmount") cfg.actions[idx][field] = Number(t.value)||0;
-    else cfg.actions[idx][field] = t.value;
+    cfg.actions[idx][field] = t.value;
     saveConfig();
   });
   actionsGrid.addEventListener("click", (e) => {
@@ -551,7 +711,7 @@
     else if(t.dataset.action === "toggle"){ cfg.actions[idx].enabled = cfg.actions[idx].enabled===false; renderActions(); saveConfig(); }
   });
   addActionBtn.addEventListener("click", () => {
-    cfg.actions.push({id:Date.now(), name:"Новое действие", effect:"pet", keywords:"", minAmount:100, enabled:true});
+    cfg.actions.push({id:Date.now(), name:"Новое действие", effect:"pet", keywords:"", enabled:true});
     renderActions(); saveConfig();
   });
 
@@ -560,6 +720,8 @@
   cfgTwitchChannel.addEventListener("change", () => { cfg.twitchChannel = cfgTwitchChannel.value.trim(); saveConfig(); connectTwitch(); });
   cfgCatchCommand.addEventListener("change", () => { cfg.catchCommand = cfgCatchCommand.value.trim() || "!ловлю"; saveConfig(); });
   cfgCatchWindow.addEventListener("change", () => { cfg.catchWindowSeconds = Number(cfgCatchWindow.value)||10; saveConfig(); });
+  cfgDonationMin.addEventListener("change", () => { cfg.donationMinAmount = Number(cfgDonationMin.value)||100; saveConfig(); });
+  cfgStrengthCap.addEventListener("change", () => { cfg.strengthCap = Number(cfgStrengthCap.value)||20; saveConfig(); });
   function applyPetPosition(){
     petCard.style.left = cfg.posX + "%";
     petCard.style.top = cfg.posY + "%";
@@ -613,15 +775,26 @@
   cfgMilkGrowthFactor.addEventListener("change", () => { cfg.milkGrowthFactor = Number(cfgMilkGrowthFactor.value)||0; saveConfig(); });
   cfgMilkHappinessCost.addEventListener("change", () => { cfg.milkHappinessCost = Number(cfgMilkHappinessCost.value)||0; saveConfig(); });
   cfgMilkFullnessCost.addEventListener("change", () => { cfg.milkFullnessCost = Number(cfgMilkFullnessCost.value)||0; saveConfig(); });
-  cfgDecayHours.addEventListener("change", () => { cfg.decayCheckHours = Number(cfgDecayHours.value)||6; saveConfig(); });
-  cfgDecayStep.addEventListener("change", () => { cfg.decayStep = Number(cfgDecayStep.value)||10; saveConfig(); });
+  cfgGaugeFill.addEventListener("change", () => { cfg.gaugeFillFactor = Number(cfgGaugeFill.value)||0; saveConfig(); });
+  cfgGaugeDrain.addEventListener("change", () => { cfg.milkGaugeDrainPerMilk = Number(cfgGaugeDrain.value)||0; saveConfig(); });
+  cfgGaugeOverflow.addEventListener("change", () => { cfg.gaugeOverflowBonus = Number(cfgGaugeOverflow.value)||0; saveConfig(); });
+  cfgDecayPerHour.addEventListener("change", () => { cfg.decayPerHour = Number(cfgDecayPerHour.value)||0; saveConfig(); });
+  cfgFeedPhrases.addEventListener("change", () => { cfg.feedPhrases = cfgFeedPhrases.value; saveConfig(); });
+  cfgPetPhrases.addEventListener("change", () => { cfg.petPhrases = cfgPetPhrases.value; saveConfig(); });
   cfgFloodThreshold.addEventListener("change", () => { cfg.floodThreshold = Number(cfgFloodThreshold.value)||10; saveConfig(); updatePetUI(); });
   cfgFloodHold.addEventListener("change", () => { cfg.floodHoldSeconds = Number(cfgFloodHold.value)||6; saveConfig(); });
   cfgFloodIncrement.addEventListener("change", () => { cfg.floodThresholdIncrement = Number(cfgFloodIncrement.value)||0; saveConfig(); });
   cfgFloodText.addEventListener("change", () => { cfg.floodText = cfgFloodText.value || "СОНЕЧКА ЗАЛИВАЕТ ВАС МОЛОЧКОМ"; saveConfig(); });
+  cfgFloodWarning.addEventListener("change", () => { cfg.floodWarningSeconds = Number(cfgFloodWarning.value)||0; saveConfig(); });
+  cfgBurstText.addEventListener("change", () => { cfg.burstWarningText = cfgBurstText.value || "СОНЕЧКА ЩАС ЛОПНЕТ"; saveConfig(); });
+  cfgPopupMin.addEventListener("change", () => { cfg.randomPopupMinMinutes = Number(cfgPopupMin.value)||15; saveConfig(); scheduleNextPopup(); });
+  cfgPopupMax.addEventListener("change", () => { cfg.randomPopupMaxMinutes = Number(cfgPopupMax.value)||45; saveConfig(); scheduleNextPopup(); });
+  cfgPopupPhrases.addEventListener("change", () => { cfg.moodPopupPhrases = cfgPopupPhrases.value; saveConfig(); });
+  cfgHintSeconds.addEventListener("change", () => { cfg.hintRotationSeconds = Number(cfgHintSeconds.value)||25; saveConfig(); });
+  testPopupBtn.addEventListener("click", () => showMoodPopup());
 
   resetPetBtn.addEventListener("click", () => {
-    Object.assign(cfg, { happiness:70, fullness:70, growth:1, milkCans:0, lastInteractionAt:Date.now(), lastDecayTickAt:Date.now() });
+    Object.assign(cfg, { happiness:70, fullness:70, growth:1, milkGauge:0, milkCans:0, lastInteractionAt:Date.now(), lastDecayTickAt:Date.now() });
     saveConfig(); updatePetUI();
   });
 
@@ -707,11 +880,20 @@
     updateSprite();
     petHappyBar.style.width = Math.max(0,Math.min(100,cfg.happiness)) + "%";
     petFullBar.style.width = Math.max(0,Math.min(100,cfg.fullness)) + "%";
+    petGaugeBar.style.width = Math.max(0,Math.min(100,cfg.milkGauge||0)) + "%";
     petMilkCount.textContent = `🥛 ${Math.floor(cfg.milkCans)} / ${cfg.floodThreshold}`;
+  }
+
+  function pickPhrase(list, fallback){
+    // перенос строки, а не запятая — фразы сами могут содержать запятые
+    const items = String(list||"").split("\n").map(s=>s.trim()).filter(Boolean);
+    if(!items.length) return fallback;
+    return items[Math.floor(Math.random()*items.length)];
   }
 
   let bubbleTimer = null;
   function showBubble(text){
+    hintBubble.classList.remove("show"); // не перекрываем реальное сообщение подсказкой
     petBubble.textContent = text;
     petBubble.classList.add("show");
     clearTimeout(bubbleTimer);
@@ -755,36 +937,51 @@
 
   // ---------- pet action logic ----------
   function handlePetDonation(amount, rawMessage, donorName){
+    if(amount < Number(cfg.donationMinAmount||100)) return; // слишком мало — Сонечка не реагирует
     const text = String(rawMessage||"").toLowerCase();
     const action = (cfg.actions||[]).find(a =>
       a.enabled !== false &&
-      amount >= Number(a.minAmount||0) &&
       parseKeywords(a.keywords).some(kw => kw && text.includes(kw))
     );
     if(!action) return;
-    applyPetAction(action, amount, donorName || "Донатер");
+    // чем больше донат относительно минималки, тем сильнее эффект (с потолком от разгона)
+    const strength = Math.min(Number(cfg.strengthCap||20), amount / Number(cfg.donationMinAmount||100));
+    applyPetAction(action, amount, donorName || "Донатер", strength);
   }
 
-  function applyPetAction(action, amount, donorName){
+  // прирост сытости/счастья подпитывает отдельную шкалу дойки; донат на дойку
+  // эту шкалу тратит, а не обнуляет счастье/сытость
+  function feedGauge(gain){
+    cfg.milkGauge = Math.min(100, (cfg.milkGauge||0) + gain * Number(cfg.gaugeFillFactor||0.6));
+  }
+
+  function applyPetAction(action, amount, donorName, strength){
     cfg.lastInteractionAt = Date.now();
     if(action.effect === "feed"){
-      cfg.fullness = Math.min(100, cfg.fullness + Number(cfg.feedFullnessStep||20));
-      cfg.growth = cfg.growth + Number(cfg.feedGrowthStep||0.2);
-      cfg.happiness = Math.min(100, cfg.happiness + 5);
-      showBubble(`${donorName} покормил(а) Сонечку! 🌾`);
+      const gain = Number(cfg.feedFullnessStep||20)*strength;
+      const overflow = Math.max(0, cfg.fullness + gain - 100);
+      cfg.fullness = Math.min(100, cfg.fullness + gain);
+      cfg.growth = cfg.growth + Number(cfg.feedGrowthStep||0.2)*strength;
+      cfg.happiness = Math.min(100, cfg.happiness + 5*strength);
+      feedGauge(gain + overflow*Number(cfg.gaugeOverflowBonus||1));
+      showBubble(`${donorName}: ${pickPhrase(cfg.feedPhrases, "Ой как вкусно!")} 🌾`);
       playFile("sounds/feed.mp3");
     } else if(action.effect === "pet"){
-      cfg.happiness = Math.min(100, cfg.happiness + Number(cfg.petHappinessStep||20));
-      showBubble(`${donorName} погладил(а) Сонечку! 💛`);
+      const gain = Number(cfg.petHappinessStep||20)*strength;
+      const overflow = Math.max(0, cfg.happiness + gain - 100);
+      cfg.happiness = Math.min(100, cfg.happiness + gain);
+      feedGauge(gain + overflow*Number(cfg.gaugeOverflowBonus||1));
+      showBubble(`${donorName}: ${pickPhrase(cfg.petPhrases, "Хи-хи-хи!")} 💛`);
       playFile("sounds/pet.mp3");
     } else if(action.effect === "milk"){
-      // milk comes FROM her happiness and fullness, not out of nowhere —
-      // a tired, hungry Сонечка gives noticeably less
-      const condition = Math.max(0.2, (cfg.happiness + cfg.fullness) / 200);
+      // молоко берётся из шкалы дойки (накопленной кормлением/лаской), а не
+      // напрямую из счастья/сытости — поэтому дойка больше не роняет её в ноль
+      const gaugeLevel = (cfg.milkGauge||0) / 100;
       const growthMult = 1 + (cfg.growth-1)*Number(cfg.milkGrowthFactor||0.5);
-      const yieldAmount = Math.max(0, Math.round(Number(cfg.milkBaseYield||1) * growthMult * condition));
-      cfg.happiness = Math.max(0, cfg.happiness - Number(cfg.milkHappinessCost||10));
-      cfg.fullness = Math.max(0, cfg.fullness - Number(cfg.milkFullnessCost||10));
+      const yieldAmount = Math.max(0, Math.round(Number(cfg.milkBaseYield||1) * growthMult * gaugeLevel * strength));
+      cfg.milkGauge = Math.max(0, (cfg.milkGauge||0) - Number(cfg.milkGaugeDrainPerMilk||35));
+      if(cfg.milkHappinessCost) cfg.happiness = Math.max(0, cfg.happiness - Number(cfg.milkHappinessCost));
+      if(cfg.milkFullnessCost) cfg.fullness = Math.max(0, cfg.fullness - Number(cfg.milkFullnessCost));
       postStat("donor", donorName, amount);
       playFile("sounds/milk.mp3");
       if(yieldAmount <= 0){
@@ -793,14 +990,49 @@
         cfg.milkCans += 1; // счётчик доек до заливки — считаем именно дойки, не литры
         cfg.pendingMilkYield = (cfg.pendingMilkYield||0) + yieldAmount; // копится на приз для ловли при заливке
         showBubble(`${donorName} подоил(а) Сонечку! 🥛 ${cfg.milkCans}/${cfg.floodThreshold}`);
-        if(cfg.milkCans >= cfg.floodThreshold) triggerFlood();
+        if(cfg.milkCans >= cfg.floodThreshold) startBurstWarning();
       }
     }
     saveConfig();
     updatePetUI();
   }
 
+  // вёдра набрались — сначала тревога с тряской, и только потом сама заливка
+  function startBurstWarning(){
+    burstWarning.textContent = cfg.burstWarningText || "СОНЕЧКА ЩАС ЛОПНЕТ";
+    burstWarning.classList.add("show");
+    petCard.classList.add("shaking");
+    setTimeout(() => {
+      burstWarning.classList.remove("show");
+      petCard.classList.remove("shaking");
+      triggerFlood();
+    }, (cfg.floodWarningSeconds||10)*1000);
+  }
+
+  function spawnMilkDrops(){
+    dropLayer.innerHTML = "";
+    const count = 40;
+    for(let i=0;i<count;i++){
+      const d = document.createElement("div");
+      d.className = "milkDrop";
+      d.style.left = Math.random()*100 + "%";
+      d.style.animationDuration = (0.9 + Math.random()*0.8) + "s";
+      d.style.animationDelay = (Math.random()*0.6) + "s";
+      dropLayer.appendChild(d);
+    }
+  }
+
+  // проигрывает всплеск несколько раз подряд (вразнобой), будто реально брызгает
+  function playSplashBurst(){
+    const hits = 6 + Math.floor(Math.random()*4);
+    for(let i=0;i<hits;i++){
+      setTimeout(() => playFile("sounds/flood.mp3"), i * (140 + Math.random()*120));
+    }
+    playFile("sounds/bryzg-bg.mp3");
+  }
+
   function triggerFlood(){
+    const catchSlots = Math.max(1, Math.round(cfg.floodThreshold));
     const prizeYield = Math.max(1, Math.round(cfg.pendingMilkYield||0));
     cfg.milkCans = 0;
     cfg.pendingMilkYield = 0;
@@ -808,29 +1040,33 @@
     saveConfig();
     floodText.textContent = cfg.floodText;
     floodOverlay.classList.add("show");
-    playFile("sounds/flood.mp3");
+    spawnMilkDrops();
+    playSplashBurst();
     setTimeout(() => floodOverlay.classList.remove("show"), (cfg.floodHoldSeconds||6)*1000);
     updatePetUI();
-    // the catch-the-milk minigame happens once, here, at the big splash —
-    // not on every individual milking
-    startCatchRound(prizeYield);
+    // ловля молока случается один раз, тут, на самой заливке — не на каждой дойке.
+    // ловцов может быть столько же, сколько было доек в этом цикле
+    startCatchRound(prizeYield, catchSlots);
   }
 
   let activeCatchRound = null;
-  function startCatchRound(milkAmount){
+  function startCatchRound(milkAmount, catchSlots){
     showBubble(`🥛 Сонечка брызгает молоком! Лови командой ${cfg.catchCommand}`);
     catchCmdLabel.textContent = cfg.catchCommand;
+    catchBanner.textContent = `🥛 Лови команду ${cfg.catchCommand}! Мест: ${catchSlots}`;
     catchBanner.classList.add("show");
-    activeCatchRound = { active:true, catchers:new Map() };
+    activeCatchRound = { active:true, slots:catchSlots, catchers:new Map() };
     const round = activeCatchRound;
     setTimeout(() => {
       if(activeCatchRound === round) activeCatchRound = null;
       catchBanner.classList.remove("show");
-      const names = Array.from(round.catchers.values());
+      const names = Array.from(round.catchers.values()).slice(0, catchSlots);
       if(names.length){
-        const winner = names[Math.floor(Math.random()*names.length)];
-        showBubble(`Молоко досталось ${winner}! 🥛`);
-        postStat("drinker", winner, milkAmount);
+        names.forEach(name => postStat("drinker", name, 1));
+        playFile("sounds/bleat.mp3");
+        catchWinnersBanner.textContent = "🐐 Поймали молоко: " + names.join(", ");
+        catchWinnersBanner.classList.add("show");
+        setTimeout(() => catchWinnersBanner.classList.remove("show"), 6000);
       } else {
         showBubble("Молоко никто не поймал, разлилось...");
       }
@@ -839,18 +1075,64 @@
   }
 
   // ---------- decay over time (neglect) ----------
+  // плавное, постепенное падение — считаем прошедшее время и снимаем долю
+  // очков пропорционально, а не рывками раз в N часов
   function applyDecayIfDue(){
-    const ms = cfg.decayCheckHours * 3600000;
-    const ticks = Math.floor((Date.now() - cfg.lastDecayTickAt) / ms);
-    if(ticks > 0){
-      cfg.happiness = Math.max(0, cfg.happiness - ticks*cfg.decayStep);
-      cfg.fullness = Math.max(0, cfg.fullness - ticks*cfg.decayStep);
-      cfg.lastDecayTickAt += ticks * ms;
-      saveConfig();
-      updatePetUI();
+    const elapsedHours = (Date.now() - cfg.lastDecayTickAt) / 3600000;
+    if(elapsedHours <= 0) return;
+    const drop = elapsedHours * Number(cfg.decayPerHour||6);
+    if(drop > 0){
+      cfg.happiness = Math.max(0, cfg.happiness - drop);
+      cfg.fullness = Math.max(0, cfg.fullness - drop);
     }
+    cfg.lastDecayTickAt = Date.now();
+    saveConfig();
+    updatePetUI();
   }
-  setInterval(applyDecayIfDue, 5*60*1000);
+  setInterval(applyDecayIfDue, 30*1000); // частый мелкий тик — снаружи выглядит плавно
+
+  // ---------- random fullscreen mood popups ("Я ГОЛОДНАЯ" и т.п.) ----------
+  let popupTimer = null;
+  function showMoodPopup(){
+    moodPopupText.textContent = pickPhrase(cfg.moodPopupPhrases, "Я ГОЛОДНАЯ");
+    moodPopupImg.style.display = "none";
+    moodPopupFallback.style.display = "none";
+    moodPopupImg.onerror = () => { moodPopupImg.style.display = "none"; moodPopupFallback.style.display = "block"; };
+    moodPopupImg.onload = () => { moodPopupImg.style.display = "block"; };
+    moodPopupImg.src = "images/sonechka.gif";
+    moodPopup.classList.add("show");
+    playFile("sounds/bleat.mp3");
+    setTimeout(() => moodPopup.classList.remove("show"), 4500);
+  }
+  function scheduleNextPopup(){
+    clearTimeout(popupTimer);
+    const lo = Math.max(1, Number(cfg.randomPopupMinMinutes||15));
+    const hi = Math.max(lo, Number(cfg.randomPopupMaxMinutes||45));
+    const delayMin = lo + Math.random()*(hi-lo);
+    popupTimer = setTimeout(() => { showMoodPopup(); scheduleNextPopup(); }, delayMin*60*1000);
+  }
+
+  // ---------- idle hint bubble — cycles tips for each action + the catch command ----------
+  function buildHints(){
+    const hints = (cfg.actions||[]).filter(a => a.enabled !== false).map(a => {
+      const kw = parseKeywords(a.keywords)[0];
+      if(!kw) return null;
+      const verb = a.effect === "feed" ? "покормить" : a.effect === "pet" ? "погладить" : "подоить";
+      return `Хотите ${verb} меня? Напишите донат от ${Math.round(cfg.donationMinAmount||100)}₽ со словом «${kw}»`;
+    }).filter(Boolean);
+    hints.push(`В момент заливки ловите молоко командой ${cfg.catchCommand} в чате!`);
+    return hints;
+  }
+  let hintIdx = 0;
+  function rotateHint(){
+    if(petBubble.classList.contains("show")) return; // не перебиваем активное сообщение
+    const hints = buildHints();
+    if(!hints.length) return;
+    hintIdx = (hintIdx + 1) % hints.length;
+    hintBubble.textContent = hints[hintIdx];
+    hintBubble.classList.add("show");
+    setTimeout(() => hintBubble.classList.remove("show"), Math.max(3000, (cfg.hintRotationSeconds||25)*1000 - 2000));
+  }
 
   // ---------- test tools ----------
   testDonateBtn.addEventListener("click", () => {
@@ -987,6 +1269,10 @@
   connectRealtime();
   connectTwitch();
   fetchStats();
+  if(!isDockSettings){
+    scheduleNextPopup();
+    setInterval(rotateHint, Math.max(5000, (cfg.hintRotationSeconds||25)*1000));
+  }
 })();
 </script>
 </body>
