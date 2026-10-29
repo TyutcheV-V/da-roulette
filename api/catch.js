@@ -2,10 +2,11 @@
 // same Upstash Redis used by stats.js. The widget opens a round when the
 // flood happens; the Twitch bot (the only thing that can actually post
 // "!ловлю" results) calls action=catch for every catch and action=balance
-// for "!молочко", and action=request to spend balance on a "!просьба"
-// (queued for the widget to show via action=requests). action=catch and
-// action=request are gated by a shared secret so a random visitor can't
-// credit or spend milk by hitting this URL directly.
+// for "!молочко", action=request to spend balance on a "!просьба" (queued
+// for the widget to show via action=requests), and action=shake to gamble
+// balance on "!взболтать". All the mutating actions are gated by a shared
+// secret so a random visitor can't credit, spend or gamble milk by hitting
+// this URL directly.
 const KV_URL = process.env.UPSTASH_REDIS_REST_URL || process.env.KV_REST_API_URL;
 const KV_TOKEN = process.env.UPSTASH_REDIS_REST_TOKEN || process.env.KV_REST_API_TOKEN;
 const CATCH_SECRET = process.env.CATCH_SECRET;
@@ -170,6 +171,45 @@ module.exports = async function handler(req, res) {
         await redis("RPUSH", REQUESTS_LOG_KEY, entry); // отдельная копия — насовсем, для дашборда (api/stats.js)
         await redis("LTRIM", REQUESTS_LOG_KEY, -REQUESTS_LOG_MAX, -1);
         res.status(200).json({ ok: true, spent: true, balance: afterSpend });
+        return;
+      }
+
+      // "!взболтать N" — ставит N литров на случайный исход (сами шансы —
+      // см. комментарий ниже, нигде не светим их зрителям); только для бота
+      if (action === "shake") {
+        if (!CATCH_SECRET || req.headers["x-bot-secret"] !== CATCH_SECRET) {
+          res.status(401).json({ error: "unauthorized" });
+          return;
+        }
+        const user = String(body.user || "").toLowerCase().trim();
+        const amount = Number(body.amount);
+        if (!user || !(amount > 0)) { res.status(400).json({ error: "missing user or amount" }); return; }
+        const afterStake = Number(await redis("ZINCRBY", BALANCE_KEY, -amount, user));
+        if (afterStake < 0) {
+          await redis("ZINCRBY", BALANCE_KEY, amount, user);
+          res.status(200).json({ ok: true, staked: false, balance: afterStake + amount });
+          return;
+        }
+        // 90% — сгорает, 8% — улетает случайному зрителю, 2% — удваивается
+        const roll = Math.random();
+        if (roll < 0.90) {
+          res.status(200).json({ ok: true, staked: true, outcome: "lost", balance: afterStake });
+          return;
+        }
+        if (roll < 0.98) {
+          const candidates = await redis("ZRANDMEMBER", BALANCE_KEY, 5);
+          const recipient = (candidates || []).find((m) => m !== user);
+          if (recipient) {
+            await redis("ZINCRBY", BALANCE_KEY, amount, recipient);
+            res.status(200).json({ ok: true, staked: true, outcome: "transferred", to: recipient, balance: afterStake });
+            return;
+          }
+          // некому отдать (кроме самого ставившего в базе никого нет) — как проигрыш
+          res.status(200).json({ ok: true, staked: true, outcome: "lost", balance: afterStake });
+          return;
+        }
+        const doubled = Number(await redis("ZINCRBY", BALANCE_KEY, amount * 2, user));
+        res.status(200).json({ ok: true, staked: true, outcome: "doubled", balance: doubled });
         return;
       }
 

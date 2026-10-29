@@ -2,7 +2,9 @@
 // Listens for the "catch" command during a flood round and credits the
 // catcher 1 litre of milk via the /api/catch backend (which is the single
 // source of truth for rounds and balances — this bot holds no Redis
-// credentials itself). Answers "!молочко" by looking up the sender's balance.
+// credentials itself). Answers "!молочко" by looking up the sender's balance,
+// "!просьба <текст>" spends balance to queue an ask for the widget, and
+// "!взболтать <N>" gambles N litres on a random outcome (backend decides it).
 const tmi = require("tmi.js");
 
 const BOT_USERNAME = requireEnv("TWITCH_BOT_USERNAME");
@@ -14,6 +16,7 @@ const CATCH_COMMAND = (process.env.CATCH_COMMAND || "!ловлю").trim().toLowe
 const BALANCE_COMMAND = (process.env.BALANCE_COMMAND || "!молочко").trim().toLowerCase();
 const REQUEST_COMMAND = (process.env.REQUEST_COMMAND || "!просьба").trim().toLowerCase();
 const REQUEST_COST = Math.max(1, Math.round(Number(process.env.REQUEST_COST) || 1));
+const SHAKE_COMMAND = (process.env.SHAKE_COMMAND || "!взболтать").trim().toLowerCase();
 
 function requireEnv(name) {
   const v = process.env[name];
@@ -43,6 +46,15 @@ async function spendOnRequest(user, text, cost) {
     method: "POST",
     headers: { "Content-Type": "application/json", "X-Bot-Secret": CATCH_SECRET },
     body: JSON.stringify({ action: "request", user, text, cost }),
+  });
+  return res.json();
+}
+
+async function shakeMilk(user, amount) {
+  const res = await fetch(CATCH_API_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "X-Bot-Secret": CATCH_SECRET },
+    body: JSON.stringify({ action: "shake", user, amount }),
   });
   return res.json();
 }
@@ -88,6 +100,33 @@ client.on("message", async (channel, tags, message, self) => {
       }
     } catch (e) {
       console.error("request spend failed", e);
+    }
+    return;
+  }
+
+  if (text === SHAKE_COMMAND || text.startsWith(SHAKE_COMMAND + " ")) {
+    const argStr = original.slice(SHAKE_COMMAND.length).trim().replace(",", ".");
+    const amount = parseFloat(argStr);
+    const displayName = tags["display-name"] || tags.username;
+    if (!(amount > 0)) {
+      await client.say(channel, `@${displayName}, укажи сколько взболтать: ${SHAKE_COMMAND} <число>`);
+      return;
+    }
+    try {
+      const result = await shakeMilk(login, amount);
+      if (!result.staked) {
+        await client.say(channel, `@${displayName}, не хватает молочка — у тебя ${formatLiters(result.balance)} л 🥛`);
+        return;
+      }
+      if (result.outcome === "doubled") {
+        await client.say(channel, `@${displayName}, взболтал(а) — и молоко удвоилось! 🎉 (теперь ${formatLiters(result.balance)} л)`);
+      } else if (result.outcome === "transferred") {
+        await client.say(channel, `@${displayName}, взболтал(а) — и молоко улетело к @${result.to}! 🌀 (осталось ${formatLiters(result.balance)} л)`);
+      } else {
+        await client.say(channel, `@${displayName}, взболтал(а)... и расплескал(а) всё 😩 (осталось ${formatLiters(result.balance)} л)`);
+      }
+    } catch (e) {
+      console.error("shake request failed", e);
     }
     return;
   }
