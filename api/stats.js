@@ -22,6 +22,23 @@ function pairUp(arr) {
   return out;
 }
 
+// Vercel's automatic req.body JSON parsing mangles non-ASCII text (Cyrillic
+// names came back as U+FFFD replacement characters) — read and parse the
+// raw body ourselves instead of trusting req.body.
+function readJsonBody(req) {
+  return new Promise((resolve, reject) => {
+    const chunks = [];
+    req.on("data", (c) => chunks.push(c));
+    req.on("end", () => {
+      try {
+        const buf = Buffer.concat(chunks);
+        resolve(buf.length ? JSON.parse(buf.toString("utf-8")) : {});
+      } catch (e) { reject(e); }
+    });
+    req.on("error", reject);
+  });
+}
+
 module.exports = async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
@@ -48,11 +65,8 @@ module.exports = async function handler(req, res) {
       return;
     }
     if (req.method === "POST") {
-      const { type, name, amount } = req.body || {};
-      if (req.query.debug === "1") {
-        res.status(200).json({ receivedName: name, charCodes: name ? Array.from(name).map(c=>c.charCodeAt(0)) : null });
-        return;
-      }
+      const body = await readJsonBody(req);
+      const { type, name, amount } = body || {};
       if (!name || !amount || (type !== "donor" && type !== "drinker")) {
         res.status(400).json({ error: "bad request" });
         return;
