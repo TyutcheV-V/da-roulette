@@ -36,10 +36,10 @@
      drag-to-reposition (arrange mode) writes new coordinates */
   #petCard{
     position:absolute; left:88%; top:85%; transform:translate(-50%,-50%);
-    width:190px; text-align:center;
-    background:var(--card-navy-dark); border:1px solid var(--card-border); border-radius:14px;
-    padding:10px 12px 12px; box-shadow:0 8px 26px rgba(0,0,0,.55);
-    touch-action:none;
+    width:190px; height:253px; text-align:center;
+    background:var(--card-navy-dark); border:1px solid var(--card-border); border-radius:18px;
+    box-shadow:0 8px 26px rgba(0,0,0,.55);
+    touch-action:none; overflow:hidden;
     animation: petGlow 3.4s ease-in-out infinite;
   }
   #petCard.arrangeMode{
@@ -60,46 +60,63 @@
   }
 
   #petSpriteWrap{
-    width:120px; height:120px; margin:0 auto 6px; border-radius:50%;
+    position:absolute; inset:0;
     background:var(--card-navy-light); display:flex; align-items:center; justify-content:center;
-    overflow:hidden; border:2px solid var(--card-border);
+    overflow:hidden;
   }
   #petSpriteImg{ width:100%; height:100%; object-fit:cover; display:none; }
   #petSpriteFallback{ font-size:56px; line-height:1; }
 
-  #petName{ font-weight:800; font-size:14px; letter-spacing:.03em; margin-bottom:6px; text-transform:uppercase; cursor:pointer; }
+  /* decorative floating hearts, purely visual */
+  .petHeartDeco{
+    position:absolute; font-size:16px; pointer-events:none; filter:drop-shadow(0 1px 3px rgba(0,0,0,.6));
+    animation: heartFloat 3.6s ease-in-out infinite;
+  }
+  @keyframes heartFloat{ 0%,100%{ transform:translateY(0) scale(1); opacity:.85; } 50%{ transform:translateY(-6px) scale(1.12); opacity:1; } }
 
+  /* small badge, top-left — bucket progress toward the next flood */
+  #petMilkBadge{
+    position:absolute; left:10px; top:10px; z-index:2;
+    background:rgba(10,14,26,.72); border:1px solid var(--card-border); border-radius:10px;
+    padding:3px 8px; font-size:11px; font-weight:700; color:#bfe0ff;
+  }
+
+  #petName{
+    position:absolute; right:10px; top:10px; z-index:2; cursor:pointer;
+    font-weight:800; font-size:11px; letter-spacing:.03em; text-transform:uppercase;
+    background:rgba(10,14,26,.6); border-radius:10px; padding:3px 9px; color:#fff;
+  }
+
+  /* bottom overlay: gradient scrim + three stat pairs (icon over percentage) */
+  #petStatsOverlay{
+    position:absolute; left:0; right:0; bottom:0; z-index:2;
+    display:flex; padding:20px 10px 10px;
+    background:linear-gradient(to bottom, rgba(10,14,26,0), rgba(10,14,26,.88) 55%);
+  }
   /* position:relative тут ради .gainPopup (всплывающая "+N") — он якорится на эту строку */
-  .petBarRow{ position:relative; display:flex; align-items:center; gap:6px; margin-bottom:4px; }
-  .petBarLabel{ font-size:13px; width:16px; text-align:center; flex:0 0 auto; }
-  .petBarTrack{ flex:1; height:8px; border-radius:4px; background:rgba(255,255,255,.1); overflow:hidden; }
-  .petBarFill{ height:100%; border-radius:4px; transition:width .5s ease; }
-  .petBarFill.happy{ background:linear-gradient(90deg,#ff5ec4,#ffd24d); }
-  .petBarFill.full{ background:linear-gradient(90deg,#4caf50,#8bffb0); }
+  .petStatItem{ position:relative; flex:1; display:flex; flex-direction:column; align-items:center; gap:2px; }
+  .petStatIcon{ font-size:17px; line-height:1; }
+  .petStatPct{ font-size:12px; font-weight:800; color:#fff; text-shadow:0 1px 3px rgba(0,0,0,.6); }
 
-  .petBarFill.gauge{ background:linear-gradient(90deg,#2e9eff,#8bffe0); }
-
-  /* когда показатель критически низкий — пульсирует иконка рядом с полоской,
-     чтобы это было заметно даже краем глаза (как иконка здоровья в играх) */
-  .petBarLabel.critical{ animation: labelPulse .8s ease-in-out infinite; }
+  /* когда показатель критически низкий — пульсирует иконка, чтобы было
+     заметно даже краем глаза (как иконка здоровья в играх) */
+  .petStatIcon.critical{ animation: labelPulse .8s ease-in-out infinite; }
   @keyframes labelPulse{
     0%,100%{ transform:scale(1); filter:drop-shadow(0 0 0 rgba(255,70,70,0)); }
     50%{ transform:scale(1.4); filter:drop-shadow(0 0 6px rgba(255,70,70,.9)); }
   }
 
-  /* всплывающая цифра прироста ("+N") над полоской при кормлении/ласке/дойке */
+  /* всплывающая цифра прироста ("+N") над иконкой при кормлении/ласке/дойке */
   .gainPopup{
-    position:absolute; right:0; top:-2px; font-weight:800; font-size:12px; color:#8bffb0;
-    pointer-events:none; text-shadow:0 1px 3px rgba(0,0,0,.7);
+    position:absolute; left:50%; bottom:100%; transform:translateX(-50%); font-weight:800; font-size:12px; color:#8bffb0;
+    pointer-events:none; text-shadow:0 1px 3px rgba(0,0,0,.7); white-space:nowrap;
     animation: gainFloat 1.1s ease-out forwards;
   }
   @keyframes gainFloat{
-    0%{ opacity:0; transform:translateY(0) scale(.8); }
-    15%{ opacity:1; transform:translateY(-4px) scale(1.15); }
-    100%{ opacity:0; transform:translateY(-22px) scale(1); }
+    0%{ opacity:0; transform:translateX(-50%) translateY(0) scale(.8); }
+    15%{ opacity:1; transform:translateX(-50%) translateY(-4px) scale(1.15); }
+    100%{ opacity:0; transform:translateX(-50%) translateY(-22px) scale(1); }
   }
-
-  #petMilkCount{ margin-top:6px; font-size:13px; font-weight:700; color:#bfe0ff; }
 
   /* subtle idle "breathing" so she doesn't look frozen */
   #petSpriteWrap{ animation: petBreathe 3.2s ease-in-out infinite; }
@@ -282,17 +299,21 @@
   </div>
 
   <div id="petCard">
-    <div id="petBubble"></div>
-    <div id="hintBubble"></div>
     <div id="petSpriteWrap">
       <img id="petSpriteImg" alt="Сонечка">
       <div id="petSpriteFallback">🐐</div>
     </div>
+    <div class="petHeartDeco" style="left:14%; top:14%;">💗</div>
+    <div class="petHeartDeco" style="left:78%; top:22%; animation-delay:.6s;">💞</div>
+    <div id="petBubble"></div>
+    <div id="hintBubble"></div>
+    <div id="petMilkBadge">🥛 0/10</div>
     <div id="petName">Сонечка</div>
-    <div class="petBarRow"><span id="happyLabel" class="petBarLabel">💛</span><div class="petBarTrack"><div id="petHappyBar" class="petBarFill happy"></div></div></div>
-    <div class="petBarRow"><span id="fullLabel" class="petBarLabel">🍽</span><div class="petBarTrack"><div id="petFullBar" class="petBarFill full"></div></div></div>
-    <div class="petBarRow"><span class="petBarLabel">🧪</span><div class="petBarTrack"><div id="petGaugeBar" class="petBarFill gauge"></div></div></div>
-    <div id="petMilkCount">🥛 0 / 10</div>
+    <div id="petStatsOverlay">
+      <div class="petStatItem" id="petHappyBar"><span id="happyLabel" class="petStatIcon">💛</span><span id="happyPct" class="petStatPct">70%</span></div>
+      <div class="petStatItem" id="petFullBar"><span id="fullLabel" class="petStatIcon">🍽</span><span id="fullPct" class="petStatPct">70%</span></div>
+      <div class="petStatItem" id="petGaugeBar"><span class="petStatIcon">🧪</span><span id="gaugePct" class="petStatPct">0%</span></div>
+    </div>
   </div>
 
   <div id="secretCorner"></div>
@@ -650,7 +671,10 @@
   const petGaugeBar = document.getElementById("petGaugeBar");
   const happyLabel = document.getElementById("happyLabel");
   const fullLabel = document.getElementById("fullLabel");
-  const petMilkCount = document.getElementById("petMilkCount");
+  const happyPctEl = document.getElementById("happyPct");
+  const fullPctEl = document.getElementById("fullPct");
+  const gaugePctEl = document.getElementById("gaugePct");
+  const petMilkBadge = document.getElementById("petMilkBadge");
   const petBubble = document.getElementById("petBubble");
   const hintBubble = document.getElementById("hintBubble");
   const dropLayer = document.getElementById("dropLayer");
@@ -1085,17 +1109,18 @@
     updateSprite();
     const happyPct = Math.max(0,Math.min(100,cfg.happiness));
     const fullPct = Math.max(0,Math.min(100,cfg.fullness));
-    petHappyBar.style.width = happyPct + "%";
-    petFullBar.style.width = fullPct + "%";
-    petGaugeBar.style.width = Math.max(0,Math.min(100,cfg.milkGauge||0)) + "%";
-    petMilkCount.textContent = `🥛 ${Math.floor(cfg.milkCans)} / ${cfg.floodThreshold}`;
+    const gaugePct = Math.max(0,Math.min(100,cfg.milkGauge||0));
+    happyPctEl.textContent = Math.round(happyPct) + "%";
+    fullPctEl.textContent = Math.round(fullPct) + "%";
+    gaugePctEl.textContent = Math.round(gaugePct) + "%";
+    petMilkBadge.textContent = `🥛 ${Math.floor(cfg.milkCans)}/${cfg.floodThreshold}`;
     happyLabel.classList.toggle("critical", happyPct < CRITICAL_STAT_THRESHOLD);
     fullLabel.classList.toggle("critical", fullPct < CRITICAL_STAT_THRESHOLD);
   }
 
   // всплывающая "+N" над нужной полоской — быстрая игровая обратная связь на донат
   function popupNear(barEl, text){
-    const row = barEl.closest(".petBarRow");
+    const row = barEl.closest(".petStatItem");
     if(!row) return;
     const el = document.createElement("div");
     el.className = "gainPopup";
