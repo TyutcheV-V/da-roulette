@@ -358,20 +358,41 @@
     <label>Текст предупреждения</label>
     <input type="text" id="cfgBurstText" value="СОНЕЧКА СЕЙЧАС ЗАПУСТИТ МОЛОКО">
 
-    <h3>Случайные капризы на весь экран</h3>
-    <div class="muted">Время от времени она сама выскакивает на весь экран со злым лицом и случайной фразой.</div>
+    <h3>Просьбы на весь экран (покорми / подои / погладь)</h3>
+    <div class="muted">Она выскакивает на весь экран и просит именно то, что ей сейчас нужно: мало сытости — просит покормить, мало счастья — просит погладить, обе полоски почти полные — просит подоить. Если всё в порядке — в этот раз просто промолчит и подождёт следующей проверки.</div>
     <div class="row">
-      <div><label>Не реже чем раз в, минут</label><input type="number" id="cfgPopupMin" value="15" min="1"></div>
-      <div><label>Не чаще чем раз в, минут</label><input type="number" id="cfgPopupMax" value="45" min="1"></div>
+      <div><label>Проверять не реже чем раз в, минут</label><input type="number" id="cfgPopupMin" value="15" min="1"></div>
+      <div><label>Проверять не чаще чем раз в, минут</label><input type="number" id="cfgPopupMax" value="45" min="1"></div>
     </div>
-    <label>Фразы капризов (каждая с новой строки)</label>
-    <textarea id="cfgPopupPhrases">Я ГОЛОДНАЯ
-МНЕ ГРУСТНО
-ПОДОИ МЕНЯ Я УЖЕ НЕ МОГУ</textarea>
-    <label>Как часто крутить подсказку над ней («покорми меня...»), сек</label>
-    <input type="number" id="cfgHintSeconds" value="25" min="5">
+    <label>Сколько секунд держится на экране</label>
+    <input type="number" id="cfgPopupHoldSeconds" value="8" min="1">
+    <div class="row" style="margin-top:6px;">
+      <div><label>Сытость ниже этого — считается худой</label><input type="number" id="cfgPopupThinThreshold" value="35" min="0" max="100"></div>
+      <div><label>Счастье ниже этого — считается грустной</label><input type="number" id="cfgPopupSadThreshold" value="50" min="0" max="100"></div>
+    </div>
+    <label>Счастье и сытость одновременно выше этого — просит подоить</label>
+    <input type="number" id="cfgPopupMilkThreshold" value="75" min="0" max="100">
+    <label>Фразы, когда просит покормить (каждая с новой строки)</label>
+    <textarea id="cfgPopupHungryPhrases">Я ГОЛОДНАЯ
+ПОКОРМИ МЕНЯ
+ЖИВОТ УРЧИТ</textarea>
+    <label>Фразы, когда просит погладить</label>
+    <textarea id="cfgPopupSadPhrases">МНЕ ГРУСТНО
+ПОГЛАДЬ МЕНЯ
+ОБНИМИ МЕНЯ</textarea>
+    <label>Фразы, когда просит подоить</label>
+    <textarea id="cfgPopupMilkPhrases">ПОДОИ МЕНЯ Я УЖЕ НЕ МОГУ
+МОЛОКО РАСПИРАЕТ
+СКОРЕЕ ПОДОИ МЕНЯ</textarea>
     <div class="row" style="margin-top:6px;">
       <button id="testPopupBtn">Показать каприз сейчас</button>
+    </div>
+
+    <h3>Подсказка над головой</h3>
+    <div class="muted">Крутится над карточкой с советами, что писать в донат. Молчит, пока недавно были донаты — появляется только когда долго было тихо.</div>
+    <div class="row">
+      <div><label>Молчать, пока не пройдёт без донатов, минут</label><input type="number" id="cfgHintIdleMinutes" value="3" min="0"></div>
+      <div><label>Как часто крутить, сек</label><input type="number" id="cfgHintSeconds" value="45" min="5"></div>
     </div>
 
     <h3>Статистика</h3>
@@ -451,10 +472,17 @@
       burstWarningText: "СОНЕЧКА СЕЙЧАС ЗАПУСТИТ МОЛОКО",
       feedPhrases: "Ой как вкусно!\nСпасибо, объедение!\nМ-м-м, то что нужно!\nТеперь я сытая!",
       petPhrases: "Хи-хи-хи!\nОчень приятно!\nМне так хорошо!\nЕщё, ещё!",
-      moodPopupPhrases: "Я ГОЛОДНАЯ\nМНЕ ГРУСТНО\nПОДОИ МЕНЯ Я УЖЕ НЕ МОГУ",
       randomPopupMinMinutes: 15,
       randomPopupMaxMinutes: 45,
-      hintRotationSeconds: 25,
+      moodPopupHoldSeconds: 8,      // сколько секунд держится каприз на весь экран
+      popupThinThreshold: 35,       // сытость ниже этого — считается худой, просит покормить
+      popupSadThreshold: 50,        // счастье ниже этого — считается грустной, просит погладить
+      popupMilkThreshold: 75,       // счастье И сытость выше этого одновременно — просит подоить
+      hungryPopupPhrases: "Я ГОЛОДНАЯ\nПОКОРМИ МЕНЯ\nЖИВОТ УРЧИТ",
+      sadPopupPhrases: "МНЕ ГРУСТНО\nПОГЛАДЬ МЕНЯ\nОБНИМИ МЕНЯ",
+      milkReadyPopupPhrases: "ПОДОИ МЕНЯ Я УЖЕ НЕ МОГУ\nМОЛОКО РАСПИРАЕТ\nСКОРЕЕ ПОДОИ МЕНЯ",
+      hintIdleMinutes: 3,            // не показывать подсказку, пока не пройдёт столько минут без донатов
+      hintRotationSeconds: 45,
       // runtime pet state, persisted alongside settings
       happiness: 70,
       fullness: 70,
@@ -572,7 +600,14 @@
   const cfgBurstText = document.getElementById("cfgBurstText");
   const cfgPopupMin = document.getElementById("cfgPopupMin");
   const cfgPopupMax = document.getElementById("cfgPopupMax");
-  const cfgPopupPhrases = document.getElementById("cfgPopupPhrases");
+  const cfgPopupHoldSeconds = document.getElementById("cfgPopupHoldSeconds");
+  const cfgPopupThinThreshold = document.getElementById("cfgPopupThinThreshold");
+  const cfgPopupSadThreshold = document.getElementById("cfgPopupSadThreshold");
+  const cfgPopupMilkThreshold = document.getElementById("cfgPopupMilkThreshold");
+  const cfgPopupHungryPhrases = document.getElementById("cfgPopupHungryPhrases");
+  const cfgPopupSadPhrases = document.getElementById("cfgPopupSadPhrases");
+  const cfgPopupMilkPhrases = document.getElementById("cfgPopupMilkPhrases");
+  const cfgHintIdleMinutes = document.getElementById("cfgHintIdleMinutes");
   const cfgHintSeconds = document.getElementById("cfgHintSeconds");
   const testPopupBtn = document.getElementById("testPopupBtn");
 
@@ -652,7 +687,14 @@
     cfgBurstText.value = cfg.burstWarningText;
     cfgPopupMin.value = cfg.randomPopupMinMinutes;
     cfgPopupMax.value = cfg.randomPopupMaxMinutes;
-    cfgPopupPhrases.value = cfg.moodPopupPhrases;
+    cfgPopupHoldSeconds.value = cfg.moodPopupHoldSeconds;
+    cfgPopupThinThreshold.value = cfg.popupThinThreshold;
+    cfgPopupSadThreshold.value = cfg.popupSadThreshold;
+    cfgPopupMilkThreshold.value = cfg.popupMilkThreshold;
+    cfgPopupHungryPhrases.value = cfg.hungryPopupPhrases;
+    cfgPopupSadPhrases.value = cfg.sadPopupPhrases;
+    cfgPopupMilkPhrases.value = cfg.milkReadyPopupPhrases;
+    cfgHintIdleMinutes.value = cfg.hintIdleMinutes;
     cfgHintSeconds.value = cfg.hintRotationSeconds;
     renderAuthStatus();
     renderActions();
@@ -795,8 +837,15 @@
   cfgBurstText.addEventListener("change", () => { cfg.burstWarningText = cfgBurstText.value || "СОНЕЧКА СЕЙЧАС ЗАПУСТИТ МОЛОКО"; saveConfig(); });
   cfgPopupMin.addEventListener("change", () => { cfg.randomPopupMinMinutes = Number(cfgPopupMin.value)||15; saveConfig(); scheduleNextPopup(); });
   cfgPopupMax.addEventListener("change", () => { cfg.randomPopupMaxMinutes = Number(cfgPopupMax.value)||45; saveConfig(); scheduleNextPopup(); });
-  cfgPopupPhrases.addEventListener("change", () => { cfg.moodPopupPhrases = cfgPopupPhrases.value; saveConfig(); });
-  cfgHintSeconds.addEventListener("change", () => { cfg.hintRotationSeconds = Number(cfgHintSeconds.value)||25; saveConfig(); });
+  cfgPopupHoldSeconds.addEventListener("change", () => { cfg.moodPopupHoldSeconds = Number(cfgPopupHoldSeconds.value)||8; saveConfig(); });
+  cfgPopupThinThreshold.addEventListener("change", () => { cfg.popupThinThreshold = Number(cfgPopupThinThreshold.value)||0; saveConfig(); });
+  cfgPopupSadThreshold.addEventListener("change", () => { cfg.popupSadThreshold = Number(cfgPopupSadThreshold.value)||0; saveConfig(); });
+  cfgPopupMilkThreshold.addEventListener("change", () => { cfg.popupMilkThreshold = Number(cfgPopupMilkThreshold.value)||0; saveConfig(); });
+  cfgPopupHungryPhrases.addEventListener("change", () => { cfg.hungryPopupPhrases = cfgPopupHungryPhrases.value; saveConfig(); });
+  cfgPopupSadPhrases.addEventListener("change", () => { cfg.sadPopupPhrases = cfgPopupSadPhrases.value; saveConfig(); });
+  cfgPopupMilkPhrases.addEventListener("change", () => { cfg.milkReadyPopupPhrases = cfgPopupMilkPhrases.value; saveConfig(); });
+  cfgHintIdleMinutes.addEventListener("change", () => { cfg.hintIdleMinutes = Number(cfgHintIdleMinutes.value)||0; saveConfig(); });
+  cfgHintSeconds.addEventListener("change", () => { cfg.hintRotationSeconds = Number(cfgHintSeconds.value)||45; saveConfig(); });
   testPopupBtn.addEventListener("click", () => showMoodPopup());
 
   resetPetBtn.addEventListener("click", () => {
@@ -1127,10 +1176,22 @@
   }
   setInterval(applyDecayIfDue, 30*1000); // частый мелкий тик — снаружи выглядит плавно
 
-  // ---------- random fullscreen mood popups ("Я ГОЛОДНАЯ" и т.п.) ----------
+  // ---------- random fullscreen mood popups ("Я ГОЛОДНАЯ", "ПОДОИ МЕНЯ" и т.п.) ----------
+  // какая просьба актуальна прямо сейчас, по её реальному состоянию; null —
+  // всё в порядке, в этот раз ничего показывать не нужно
+  function pickMoodCategory(){
+    if(cfg.fullness < Number(cfg.popupThinThreshold||35)) return "hungry";
+    if(cfg.happiness < Number(cfg.popupSadThreshold||50)) return "sad";
+    const milkLvl = Number(cfg.popupMilkThreshold||75);
+    if(cfg.happiness >= milkLvl && cfg.fullness >= milkLvl) return "milk";
+    return null;
+  }
   let popupTimer = null;
-  function showMoodPopup(){
-    moodPopupText.textContent = pickPhrase(cfg.moodPopupPhrases, "Я ГОЛОДНАЯ");
+  function showMoodPopup(category){
+    const cat = category || pickMoodCategory() || "hungry";
+    const phrases = cat === "hungry" ? cfg.hungryPopupPhrases : cat === "sad" ? cfg.sadPopupPhrases : cfg.milkReadyPopupPhrases;
+    const fallback = cat === "hungry" ? "Я ГОЛОДНАЯ" : cat === "sad" ? "МНЕ ГРУСТНО" : "ПОДОИ МЕНЯ";
+    moodPopupText.textContent = pickPhrase(phrases, fallback);
     moodPopupImg.style.display = "none";
     moodPopupFallback.style.display = "none";
     moodPopupImg.onerror = () => { moodPopupImg.style.display = "none"; moodPopupFallback.style.display = "block"; };
@@ -1138,14 +1199,18 @@
     moodPopupImg.src = "images/sonechka.gif";
     moodPopup.classList.add("show");
     playFile("sounds/bleat.mp3");
-    setTimeout(() => moodPopup.classList.remove("show"), 4500);
+    setTimeout(() => moodPopup.classList.remove("show"), Number(cfg.moodPopupHoldSeconds||8)*1000);
   }
   function scheduleNextPopup(){
     clearTimeout(popupTimer);
     const lo = Math.max(1, Number(cfg.randomPopupMinMinutes||15));
     const hi = Math.max(lo, Number(cfg.randomPopupMaxMinutes||45));
     const delayMin = lo + Math.random()*(hi-lo);
-    popupTimer = setTimeout(() => { showMoodPopup(); scheduleNextPopup(); }, delayMin*60*1000);
+    popupTimer = setTimeout(() => {
+      const cat = pickMoodCategory();
+      if(cat) showMoodPopup(cat); // ей реально что-то нужно — иначе этот цикл просто пропускаем
+      scheduleNextPopup();
+    }, delayMin*60*1000);
   }
 
   // ---------- idle hint bubble — cycles tips for each action + the catch command ----------
@@ -1162,13 +1227,15 @@
   let hintIdx = 0;
   function rotateHint(){
     if(petBubble.classList.contains("show")) return; // не перебиваем активное сообщение
+    const idleMs = Date.now() - (cfg.lastInteractionAt||0);
+    if(idleMs < Number(cfg.hintIdleMinutes||3)*60000) return; // недавно донатили — подсказка пока не нужна
     const hints = buildHints();
     if(!hints.length) return;
     hintIdx = (hintIdx + 1) % hints.length;
     hintBubble.textContent = hints[hintIdx];
     hintBubble.classList.add("show");
     clampBubbleToStage(hintBubble);
-    setTimeout(() => hintBubble.classList.remove("show"), Math.max(3000, (cfg.hintRotationSeconds||25)*1000 - 2000));
+    setTimeout(() => hintBubble.classList.remove("show"), Math.max(3000, (cfg.hintRotationSeconds||45)*1000 - 2000));
   }
 
   // ---------- test tools ----------
@@ -1308,7 +1375,7 @@
   fetchStats();
   if(!isDockSettings){
     scheduleNextPopup();
-    setInterval(rotateHint, Math.max(5000, (cfg.hintRotationSeconds||25)*1000));
+    setInterval(rotateHint, Math.max(5000, (cfg.hintRotationSeconds||45)*1000));
   }
 })();
 </script>
