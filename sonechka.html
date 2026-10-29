@@ -67,7 +67,7 @@
   #petSpriteImg{ width:100%; height:100%; object-fit:cover; display:none; }
   #petSpriteFallback{ font-size:56px; line-height:1; }
 
-  #petName{ font-weight:800; font-size:14px; letter-spacing:.03em; margin-bottom:6px; text-transform:uppercase; }
+  #petName{ font-weight:800; font-size:14px; letter-spacing:.03em; margin-bottom:6px; text-transform:uppercase; cursor:pointer; }
 
   /* position:relative тут ради .gainPopup (всплывающая "+N") — он якорится на эту строку */
   .petBarRow{ position:relative; display:flex; align-items:center; gap:6px; margin-bottom:4px; }
@@ -664,6 +664,7 @@
 
   const secretCorner = document.getElementById("secretCorner");
   const gearBtn = document.getElementById("gearBtn");
+  const petNameEl = document.getElementById("petName");
   const settingsPanel = document.getElementById("settingsPanel");
 
   const cfgClientId = document.getElementById("cfgClientId");
@@ -769,6 +770,7 @@
   }
   gearBtn.addEventListener("click", toggleSettingsPanel);
   secretCorner.addEventListener("click", toggleSettingsPanel);
+  petNameEl.addEventListener("click", toggleSettingsPanel);
 
   function escapeHtml(s){
     return String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
