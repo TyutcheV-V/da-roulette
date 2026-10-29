@@ -105,6 +105,10 @@
     opacity:0; pointer-events:none; transition:opacity .4s ease;
   }
   #floodOverlay.show{ opacity:1; animation:floodWash 1.4s ease-out; }
+  #floodVideo{
+    position:absolute; inset:0; width:100%; height:100%; object-fit:cover;
+    opacity:.55; mix-blend-mode:screen;
+  }
   @keyframes floodWash{
     0%{ clip-path: circle(0% at 50% 100%); }
     100%{ clip-path: circle(150% at 50% 100%); }
@@ -217,7 +221,11 @@
 </head>
 <body>
 <div id="stage">
-  <div id="floodOverlay"><div id="floodText"></div><div id="dropLayer"></div></div>
+  <div id="floodOverlay">
+    <video id="floodVideo" muted loop playsinline></video>
+    <div id="floodText"></div>
+    <div id="dropLayer"></div>
+  </div>
   <div id="catchBanner">🥛 Лови команду <span id="catchCmdLabel">!ловлю</span>!</div>
   <div id="burstWarning">СОНЕЧКА ЩАС ЛОПНЕТ</div>
   <div id="catchWinnersBanner"></div>
@@ -502,6 +510,8 @@
 
   // ---------- DOM refs ----------
   const floodOverlay = document.getElementById("floodOverlay");
+  const floodVideo = document.getElementById("floodVideo");
+  floodVideo.src = "images/bryzg.mp4";
   const floodText = document.getElementById("floodText");
   const catchBanner = document.getElementById("catchBanner");
   const catchCmdLabel = document.getElementById("catchCmdLabel");
@@ -1042,7 +1052,11 @@
     floodOverlay.classList.add("show");
     spawnMilkDrops();
     playSplashBurst();
-    setTimeout(() => floodOverlay.classList.remove("show"), (cfg.floodHoldSeconds||6)*1000);
+    try{ floodVideo.currentTime = 0; floodVideo.play().catch(()=>{}); }catch(e){}
+    setTimeout(() => {
+      floodOverlay.classList.remove("show");
+      try{ floodVideo.pause(); }catch(e){}
+    }, (cfg.floodHoldSeconds||6)*1000);
     updatePetUI();
     // ловля молока случается один раз, тут, на самой заливке — не на каждой дойке.
     // ловцов может быть столько же, сколько было доек в этом цикле
@@ -1266,6 +1280,7 @@
   applyDecayIfDue();
   renderSettingsForm();
   if(isDockSettings) settingsPanel.classList.add("open");
+  else playFile("sounds/startup.mp3"); // звук при запуске виджета, не в режиме дока
   connectRealtime();
   connectTwitch();
   fetchStats();
