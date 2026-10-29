@@ -189,6 +189,18 @@
   body.noProgress .progressOnlySection{ display:none !important; }
   body.noRoulette .rouletteOnlySection{ display:none !important; }
 
+  /* ---------- OBS Custom Browser Dock mode (?view=settings) ---------- */
+  /* lives only inside the OBS window itself, never in a scene/stream —
+     so the panel can just stay open and fill the whole dock */
+  body.dockMode{ background:#101018; }
+  body.dockMode #stage > *:not(#settingsPanel){ display:none !important; }
+  body.dockMode .progressOnlySection, body.dockMode .rouletteOnlySection{ display:block !important; }
+  body.dockMode #settingsPanel{
+    position:static; display:block; width:100%; max-width:none; height:auto;
+    min-height:100vh; max-height:none; border-radius:0; box-shadow:none;
+    box-sizing:border-box;
+  }
+
   /* ---------- category cards ---------- */
   #categoriesGrid{ display:flex; flex-wrap:wrap; gap:10px; margin-top:8px; }
   .catCard{
@@ -368,8 +380,9 @@
 
   const urlParams = new URLSearchParams(location.search);
   const viewMode = urlParams.get("view"); // null/other = full widget, "progress", "roulette"
-  const hasProgressUI = viewMode !== "roulette";
-  const hasRouletteUI = viewMode !== "progress";
+  const isDockSettings = viewMode === "settings"; // for an OBS Custom Browser Dock — never part of any scene
+  const hasProgressUI = viewMode !== "roulette" && !isDockSettings;
+  const hasRouletteUI = viewMode !== "progress" && !isDockSettings;
   const editMode = urlParams.get("edit") === "1"; // gear icon only shows with &edit=1, so it never ends up on stream
 
   const RARITY_LEVELS = [
@@ -490,6 +503,7 @@
   document.body.classList.toggle("noProgress", !hasProgressUI);
   document.body.classList.toggle("editMode", editMode);
   document.body.classList.toggle("noRoulette", !hasRouletteUI);
+  document.body.classList.toggle("dockMode", isDockSettings);
 
   // ---------- cross-document sync (localStorage is shared between OBS browser sources of the same origin) ----------
   const watchers = {};
@@ -1192,6 +1206,8 @@
   }
   updateProgressUI();
   renderSettingsForm();
+  // in dock mode the panel IS the whole page — no gear/corner click needed
+  if(isDockSettings) settingsPanel.classList.add("open");
   // only the widget that shows the collection card owns the realtime connection,
   // so a roulette-only widget never double-counts the same donation
   if(hasProgressUI) connectRealtime();
