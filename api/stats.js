@@ -34,6 +34,11 @@ module.exports = async function handler(req, res) {
   }
 
   try {
+    if (req.method === "GET" && req.query.debug === "1") {
+      const raw = await redis("ZREVRANGE", "sonechka:donors", 0, 19, "WITHSCORES");
+      res.status(200).json({ raw, charCodes: raw.map(s => typeof s === "string" ? Array.from(s).map(c=>c.charCodeAt(0)) : s) });
+      return;
+    }
     if (req.method === "GET") {
       const [donors, drinkers] = await Promise.all([
         redis("ZREVRANGE", "sonechka:donors", 0, 19, "WITHSCORES"),
