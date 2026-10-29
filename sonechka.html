@@ -26,16 +26,19 @@
   }
 
   /* ---------- pet card ---------- */
+  /* position is a percentage of the stage (left/top = card center), set from
+     JS via cfg.posX/posY — works at any OBS source resolution and is how
+     drag-to-reposition (arrange mode) writes new coordinates */
   #petCard{
-    position:absolute; width:190px; text-align:center;
+    position:absolute; left:88%; top:85%; transform:translate(-50%,-50%);
+    width:190px; text-align:center;
     background:var(--card-navy-dark); border:1px solid var(--card-border); border-radius:14px;
     padding:10px 12px 12px; box-shadow:0 8px 26px rgba(0,0,0,.55);
-    transition: transform .2s ease;
+    touch-action:none;
   }
-  #petCard.pos-bottom-right{ right:16px; bottom:16px; }
-  #petCard.pos-bottom-left{ left:16px; bottom:16px; }
-  #petCard.pos-top-right{ right:16px; top:16px; }
-  #petCard.pos-top-left{ left:16px; top:16px; }
+  #petCard.arrangeMode{
+    cursor:move; outline:2px dashed #ff6a3d; outline-offset:4px;
+  }
 
   #petSpriteWrap{
     width:120px; height:120px; margin:0 auto 6px; border-radius:50%;
@@ -56,18 +59,14 @@
 
   #petMilkCount{ margin-top:6px; font-size:13px; font-weight:700; color:#bfe0ff; }
 
-  /* ---------- speech bubble ---------- */
+  /* ---------- speech bubble (now a child of #petCard, so it follows it when dragged) ---------- */
   #petBubble{
-    position:absolute; max-width:260px; padding:8px 12px; border-radius:12px;
+    position:absolute; left:50%; bottom:100%; transform:translateX(-50%) translateY(6px);
+    width:220px; margin-bottom:10px; padding:8px 12px; border-radius:12px;
     background:rgba(18,26,44,.95); border:1px solid var(--card-border); font-size:13px; font-weight:600;
     text-align:center; opacity:0; pointer-events:none; transition:opacity .3s ease, transform .3s ease;
-    transform:translateY(6px);
   }
-  #petBubble.show{ opacity:1; transform:translateY(0); }
-  #petCard.pos-bottom-right ~ #petBubble, #petCard.pos-top-right ~ #petBubble{ right:16px; }
-  #petCard.pos-bottom-left ~ #petBubble, #petCard.pos-top-left ~ #petBubble{ left:16px; }
-  #petCard.pos-bottom-right ~ #petBubble, #petCard.pos-bottom-left ~ #petBubble{ bottom:190px; }
-  #petCard.pos-top-right ~ #petBubble, #petCard.pos-top-left ~ #petBubble{ top:190px; }
+  #petBubble.show{ opacity:1; transform:translateX(-50%) translateY(0); }
 
   /* ---------- catch banner ---------- */
   #catchBanner{
@@ -152,7 +151,8 @@
   <div id="floodOverlay"><div id="floodText"></div></div>
   <div id="catchBanner">🥛 Лови команду <span id="catchCmdLabel">!ловлю</span>!</div>
 
-  <div id="petCard" class="pos-bottom-right">
+  <div id="petCard">
+    <div id="petBubble"></div>
     <div id="petSpriteWrap">
       <img id="petSpriteImg" alt="Сонечка">
       <div id="petSpriteFallback">🐐</div>
@@ -162,8 +162,6 @@
     <div class="petBarRow"><span class="petBarLabel">🍽</span><div class="petBarTrack"><div id="petFullBar" class="petBarFill full"></div></div></div>
     <div id="petMilkCount">🥛 0 / 10</div>
   </div>
-
-  <div id="petBubble"></div>
 
   <div id="secretCorner"></div>
   <button id="gearBtn" title="Настройки">⚙</button>
@@ -191,14 +189,24 @@
     <label>Сколько секунд ловим (окно команды)</label>
     <input type="number" id="cfgCatchWindow" value="10" min="3" max="60">
 
-    <h3>Расположение и звук</h3>
-    <label>Угол экрана</label>
-    <select id="cfgCornerPosition">
-      <option value="pos-bottom-right">Снизу справа</option>
-      <option value="pos-bottom-left">Снизу слева</option>
-      <option value="pos-top-right">Сверху справа</option>
-      <option value="pos-top-left">Сверху слева</option>
-    </select>
+    <h3>Расположение</h3>
+    <div class="muted">Источник в OBS должен быть на весь холст (например 1920×1080) — иначе заливка молоком не займёт весь экран, а Сонечка всё равно встанет в нужное место за счёт отступов.</div>
+    <button id="arrangeModeBtn" style="margin-top:6px;">Включить перетаскивание</button>
+    <div class="muted" id="arrangeHint" style="display:none;">Режим включён — тащи карточку Сонечки мышкой (через Interact в OBS) куда нужно. Выключи режим, когда закончишь.</div>
+    <div class="row" style="margin-top:8px;">
+      <button class="posPresetBtn" data-x="12" data-y="15">↖ Верх-лево</button>
+      <button class="posPresetBtn" data-x="88" data-y="15">↗ Верх-право</button>
+    </div>
+    <div class="row">
+      <button class="posPresetBtn" data-x="12" data-y="85">↙ Низ-лево</button>
+      <button class="posPresetBtn" data-x="88" data-y="85">↘ Низ-право</button>
+    </div>
+    <div class="row" style="margin-top:8px;">
+      <div><label>X, % слева</label><input type="number" id="cfgPosX" min="0" max="100" value="88"></div>
+      <div><label>Y, % сверху</label><input type="number" id="cfgPosY" min="0" max="100" value="85"></div>
+    </div>
+
+    <h3>Звук</h3>
     <label><input type="checkbox" id="cfgMuteSound" style="width:auto;"> выключить звук</label>
     <label>Громкость</label>
     <input type="range" id="cfgSoundVolume" min="0" max="100" value="80">
@@ -285,7 +293,8 @@
 
   function defaultConfig(){
     return {
-      cornerPosition: "pos-bottom-right",
+      posX: 88,
+      posY: 85,
       twitchChannel: "",
       catchCommand: "!ловлю",
       catchWindowSeconds: 10,
@@ -375,7 +384,10 @@
   const cfgTwitchChannel = document.getElementById("cfgTwitchChannel");
   const cfgCatchCommand = document.getElementById("cfgCatchCommand");
   const cfgCatchWindow = document.getElementById("cfgCatchWindow");
-  const cfgCornerPosition = document.getElementById("cfgCornerPosition");
+  const arrangeModeBtn = document.getElementById("arrangeModeBtn");
+  const arrangeHint = document.getElementById("arrangeHint");
+  const cfgPosX = document.getElementById("cfgPosX");
+  const cfgPosY = document.getElementById("cfgPosY");
   const cfgMuteSound = document.getElementById("cfgMuteSound");
   const cfgSoundVolume = document.getElementById("cfgSoundVolume");
 
@@ -437,7 +449,8 @@
     cfgTwitchChannel.value = cfg.twitchChannel || "";
     cfgCatchCommand.value = cfg.catchCommand;
     cfgCatchWindow.value = cfg.catchWindowSeconds;
-    cfgCornerPosition.value = cfg.cornerPosition;
+    cfgPosX.value = Math.round(cfg.posX);
+    cfgPosY.value = Math.round(cfg.posY);
     cfgMuteSound.checked = !!cfg.muteSound;
     cfgSoundVolume.value = cfg.soundVolume;
     cfgFeedFullness.value = cfg.feedFullnessStep;
@@ -520,9 +533,49 @@
   cfgTwitchChannel.addEventListener("change", () => { cfg.twitchChannel = cfgTwitchChannel.value.trim(); saveConfig(); connectTwitch(); });
   cfgCatchCommand.addEventListener("change", () => { cfg.catchCommand = cfgCatchCommand.value.trim() || "!ловлю"; saveConfig(); });
   cfgCatchWindow.addEventListener("change", () => { cfg.catchWindowSeconds = Number(cfgCatchWindow.value)||10; saveConfig(); });
-  cfgCornerPosition.addEventListener("change", () => {
-    cfg.cornerPosition = cfgCornerPosition.value; saveConfig();
-    petCard.className = cfg.cornerPosition;
+  function applyPetPosition(){
+    petCard.style.left = cfg.posX + "%";
+    petCard.style.top = cfg.posY + "%";
+  }
+  cfgPosX.addEventListener("change", () => { cfg.posX = Math.max(0,Math.min(100,Number(cfgPosX.value)||0)); saveConfig(); applyPetPosition(); });
+  cfgPosY.addEventListener("change", () => { cfg.posY = Math.max(0,Math.min(100,Number(cfgPosY.value)||0)); saveConfig(); applyPetPosition(); });
+
+  document.querySelectorAll(".posPresetBtn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      cfg.posX = Number(btn.dataset.x); cfg.posY = Number(btn.dataset.y);
+      saveConfig(); applyPetPosition();
+      cfgPosX.value = cfg.posX; cfgPosY.value = cfg.posY;
+    });
+  });
+
+  let arrangeMode = false;
+  arrangeModeBtn.addEventListener("click", () => {
+    arrangeMode = !arrangeMode;
+    petCard.classList.toggle("arrangeMode", arrangeMode);
+    arrangeHint.style.display = arrangeMode ? "block" : "none";
+    arrangeModeBtn.textContent = arrangeMode ? "Выключить перетаскивание" : "Включить перетаскивание";
+  });
+
+  let dragging = false;
+  petCard.addEventListener("pointerdown", (e) => {
+    if(!arrangeMode) return;
+    dragging = true;
+    petCard.setPointerCapture(e.pointerId);
+    e.preventDefault();
+  });
+  petCard.addEventListener("pointermove", (e) => {
+    if(!dragging) return;
+    const stageRect = document.getElementById("stage").getBoundingClientRect();
+    const pctX = Math.max(3, Math.min(97, ((e.clientX - stageRect.left) / stageRect.width) * 100));
+    const pctY = Math.max(3, Math.min(97, ((e.clientY - stageRect.top) / stageRect.height) * 100));
+    cfg.posX = pctX; cfg.posY = pctY;
+    applyPetPosition();
+  });
+  petCard.addEventListener("pointerup", (e) => {
+    if(!dragging) return;
+    dragging = false;
+    saveConfig();
+    cfgPosX.value = Math.round(cfg.posX); cfgPosY.value = Math.round(cfg.posY);
   });
   cfgMuteSound.addEventListener("change", () => { cfg.muteSound = cfgMuteSound.checked; saveConfig(); });
   cfgSoundVolume.addEventListener("input", () => { cfg.soundVolume = Number(cfgSoundVolume.value)||0; saveConfig(); });
@@ -581,7 +634,7 @@
       saveConfig();
       renderSettingsForm();
       updatePetUI();
-      petCard.className = cfg.cornerPosition;
+      applyPetPosition();
       connectTwitch();
       alert("Настройки импортированы");
     }catch(e){ alert("Не получилось разобрать JSON: " + e.message); }
@@ -876,7 +929,7 @@
   }
 
   // ---------- init ----------
-  petCard.className = cfg.cornerPosition;
+  applyPetPosition();
   updatePetUI();
   applyDecayIfDue();
   renderSettingsForm();
