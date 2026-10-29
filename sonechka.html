@@ -322,9 +322,14 @@
     </div>
 
     <h3>Голод и грусть без донатов</h3>
-    <div class="muted">Падает плавно и постепенно, не рывками.</div>
+    <div class="muted">Падает плавно и постепенно, не рывками. Например, 6.25 — это полное похудение/погрустнение из максимума за 16 часов (100 / 16 = 6.25).</div>
     <label>Очков счастья и сытости теряется в час</label>
-    <input type="number" id="cfgDecayPerHour" value="6" min="0" step="0.5">
+    <input type="number" id="cfgDecayPerHour" value="6.25" min="0" step="0.05">
+    <div class="muted" style="margin-top:6px;">Если донат приходит на уже полную (или почти полную) полоску, перелив не пропадает — вместо этого именно эта полоска какое-то время падает медленнее.</div>
+    <div class="row">
+      <div><label>Минут замедления за очко перелива</label><input type="number" id="cfgOverflowSlowMinutes" value="3" min="0" step="0.5"></div>
+      <div><label>Скорость падения во время замедления (0.4 = на 60% медленнее)</label><input type="number" id="cfgOverflowSlowFactor" value="0.4" min="0" max="1" step="0.05"></div>
+    </div>
 
     <h3>Фразы Сонечки</h3>
     <label>При кормлении (каждая фраза с новой строки, выбирается случайно)</label>
@@ -435,7 +440,9 @@
       milkGaugeFillPerDonation: 40, // насколько шкала дойки заполняется за один макс. донат
       milkHappinessCost: 10,
       milkFullnessCost: 10,
-      decayPerHour: 6,           // плавное падение счастья/сытости, очков в час
+      decayPerHour: 6.25,        // плавное падение счастья/сытости, очков в час (100/16ч = полностью за 16 часов)
+      overflowSlowMinutes: 3,    // минут замедленного падения за каждое очко "перелива" (донат на уже полную полоску)
+      overflowSlowFactor: 0.4,   // во время замедления падение идёт с этой долей скорости (0.4 = на 60% медленнее)
       floodThreshold: 10,
       floodThresholdIncrement: 1, // 10 -> 11 -> 12 ... after each flood
       floodWarningSeconds: 10,    // держим "ЩАС ЛОПНЕТ" перед самой заливкой
@@ -454,6 +461,8 @@
       milkGauge: 0,
       growth: 1,
       milkCans: 0,
+      happinessSlowUntil: 0,
+      fullnessSlowUntil: 0,
       lastInteractionAt: Date.now(),
       lastDecayTickAt: Date.now()
     };
@@ -551,6 +560,8 @@
   const cfgMilkHappinessCost = document.getElementById("cfgMilkHappinessCost");
   const cfgMilkFullnessCost = document.getElementById("cfgMilkFullnessCost");
   const cfgDecayPerHour = document.getElementById("cfgDecayPerHour");
+  const cfgOverflowSlowMinutes = document.getElementById("cfgOverflowSlowMinutes");
+  const cfgOverflowSlowFactor = document.getElementById("cfgOverflowSlowFactor");
   const cfgFeedPhrases = document.getElementById("cfgFeedPhrases");
   const cfgPetPhrases = document.getElementById("cfgPetPhrases");
   const cfgFloodThreshold = document.getElementById("cfgFloodThreshold");
@@ -629,6 +640,8 @@
     cfgMilkHappinessCost.value = cfg.milkHappinessCost;
     cfgMilkFullnessCost.value = cfg.milkFullnessCost;
     cfgDecayPerHour.value = cfg.decayPerHour;
+    cfgOverflowSlowMinutes.value = cfg.overflowSlowMinutes;
+    cfgOverflowSlowFactor.value = cfg.overflowSlowFactor;
     cfgFeedPhrases.value = cfg.feedPhrases;
     cfgPetPhrases.value = cfg.petPhrases;
     cfgFloodThreshold.value = cfg.floodThreshold;
@@ -770,6 +783,8 @@
   cfgMilkHappinessCost.addEventListener("change", () => { cfg.milkHappinessCost = Number(cfgMilkHappinessCost.value)||0; saveConfig(); });
   cfgMilkFullnessCost.addEventListener("change", () => { cfg.milkFullnessCost = Number(cfgMilkFullnessCost.value)||0; saveConfig(); });
   cfgDecayPerHour.addEventListener("change", () => { cfg.decayPerHour = Number(cfgDecayPerHour.value)||0; saveConfig(); });
+  cfgOverflowSlowMinutes.addEventListener("change", () => { cfg.overflowSlowMinutes = Number(cfgOverflowSlowMinutes.value)||0; saveConfig(); });
+  cfgOverflowSlowFactor.addEventListener("change", () => { cfg.overflowSlowFactor = Number(cfgOverflowSlowFactor.value)||0; saveConfig(); });
   cfgFeedPhrases.addEventListener("change", () => { cfg.feedPhrases = cfgFeedPhrases.value; saveConfig(); });
   cfgPetPhrases.addEventListener("change", () => { cfg.petPhrases = cfgPetPhrases.value; saveConfig(); });
   cfgFloodThreshold.addEventListener("change", () => { cfg.floodThreshold = Number(cfgFloodThreshold.value)||10; saveConfig(); updatePetUI(); });
@@ -785,7 +800,7 @@
   testPopupBtn.addEventListener("click", () => showMoodPopup());
 
   resetPetBtn.addEventListener("click", () => {
-    Object.assign(cfg, { happiness:70, fullness:70, growth:1, milkGauge:0, milkCans:0, lastInteractionAt:Date.now(), lastDecayTickAt:Date.now() });
+    Object.assign(cfg, { happiness:70, fullness:70, growth:1, milkGauge:0, milkCans:0, happinessSlowUntil:0, fullnessSlowUntil:0, lastInteractionAt:Date.now(), lastDecayTickAt:Date.now() });
     saveConfig(); updatePetUI();
   });
 
@@ -958,16 +973,30 @@
     return Math.max(0, Math.min(1, (amount - lo) / (hi - lo)));
   }
 
+  // донат на уже полную (или почти полную) полоску не пропадает зря — перелив
+  // сверх 100 превращается в временное замедление её падения
+  function applyOverflowSlowdown(overflow, slowUntilField){
+    if(overflow <= 0) return;
+    const slowMs = overflow * Number(cfg.overflowSlowMinutes||3) * 60000;
+    cfg[slowUntilField] = Math.max(cfg[slowUntilField]||0, Date.now()) + slowMs;
+  }
+
   function applyPetAction(action, amount, donorName){
     cfg.lastInteractionAt = Date.now();
     const strength = donationStrength01(amount);
     if(action.effect === "feed"){
-      cfg.fullness = Math.min(100, cfg.fullness + Number(cfg.feedFullnessStep||60)*strength);
+      const gain = Number(cfg.feedFullnessStep||60)*strength;
+      const overflow = Math.max(0, cfg.fullness + gain - 100);
+      cfg.fullness = Math.min(100, cfg.fullness + gain);
       cfg.growth = cfg.growth + Number(cfg.feedGrowthStep||0.2)*strength;
+      applyOverflowSlowdown(overflow, "fullnessSlowUntil");
       showBubble(`${donorName}: ${pickPhrase(cfg.feedPhrases, "Ой как вкусно!")} 🌾`);
       playFile("sounds/feed.mp3");
     } else if(action.effect === "pet"){
-      cfg.happiness = Math.min(100, cfg.happiness + Number(cfg.petHappinessStep||60)*strength);
+      const gain = Number(cfg.petHappinessStep||60)*strength;
+      const overflow = Math.max(0, cfg.happiness + gain - 100);
+      cfg.happiness = Math.min(100, cfg.happiness + gain);
+      applyOverflowSlowdown(overflow, "happinessSlowUntil");
       showBubble(`${donorName}: ${pickPhrase(cfg.petPhrases, "Хи-хи-хи!")} 💛`);
       playFile("sounds/pet.mp3");
     } else if(action.effect === "milk"){
@@ -1080,14 +1109,18 @@
   // плавное, постепенное падение — считаем прошедшее время и снимаем долю
   // очков пропорционально, а не рывками раз в N часов
   function applyDecayIfDue(){
-    const elapsedHours = (Date.now() - cfg.lastDecayTickAt) / 3600000;
+    const now = Date.now();
+    const elapsedHours = (now - cfg.lastDecayTickAt) / 3600000;
     if(elapsedHours <= 0) return;
-    const drop = elapsedHours * Number(cfg.decayPerHour||6);
-    if(drop > 0){
-      cfg.happiness = Math.max(0, cfg.happiness - drop);
-      cfg.fullness = Math.max(0, cfg.fullness - drop);
+    const baseDrop = elapsedHours * Number(cfg.decayPerHour||6.25);
+    if(baseDrop > 0){
+      // перелив от донатов на уже полную полоску временно замедляет именно её падение
+      const happyFactor = (cfg.happinessSlowUntil||0) > now ? Number(cfg.overflowSlowFactor||0.4) : 1;
+      const fullFactor = (cfg.fullnessSlowUntil||0) > now ? Number(cfg.overflowSlowFactor||0.4) : 1;
+      cfg.happiness = Math.max(0, cfg.happiness - baseDrop*happyFactor);
+      cfg.fullness = Math.max(0, cfg.fullness - baseDrop*fullFactor);
     }
-    cfg.lastDecayTickAt = Date.now();
+    cfg.lastDecayTickAt = now;
     saveConfig();
     updatePetUI();
   }
