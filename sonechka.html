@@ -245,11 +245,13 @@
     </div>
 
     <h3>Заливка молоком</h3>
-    <div class="row">
-      <div><label>Доек до заливки</label><input type="number" id="cfgFloodThreshold" value="10" min="1"></div>
+    <div class="muted">Ловля молока чатом (команда «!ловлю») происходит один раз — именно в момент большой заливки, не на каждой дойке.</div>
+    <div class="row" style="margin-top:6px;">
+      <div><label>Доек до заливки (сейчас)</label><input type="number" id="cfgFloodThreshold" value="10" min="1"></div>
       <div><label>Держать на экране, сек</label><input type="number" id="cfgFloodHold" value="6" min="1"></div>
     </div>
-    <label><input type="checkbox" id="cfgFloodCarryOver" style="width:auto;" checked> следующий круг стартует сразу с 1 дойки (не с нуля)</label>
+    <label>Насколько растёт порог после каждой заливки (10 → 11 → 12...)</label>
+    <input type="number" id="cfgFloodIncrement" value="1" min="0">
     <label>Текст на весь экран</label>
     <input type="text" id="cfgFloodText" value="СОНЕЧКА ЗАЛИВАЕТ ВАС МОЛОЧКОМ ОТКРЫВАЙТЕ РОТИК">
 
@@ -321,12 +323,13 @@
       decayCheckHours: 6,
       decayStep: 10,
       floodThreshold: 10,
+      floodThresholdIncrement: 1, // 10 -> 11 -> 12 ... after each flood
       floodHoldSeconds: 6,
-      floodCarryOver: true,
       floodText: "СОНЕЧКА ЗАЛИВАЕТ ВАС МОЛОЧКОМ ОТКРЫВАЙТЕ РОТИК",
       // runtime pet state, persisted alongside settings
       happiness: 70,
       fullness: 70,
+      pendingMilkYield: 0,
       growth: 1,
       milkCans: 0,
       lastInteractionAt: Date.now(),
@@ -416,8 +419,8 @@
   const cfgDecayHours = document.getElementById("cfgDecayHours");
   const cfgDecayStep = document.getElementById("cfgDecayStep");
   const cfgFloodThreshold = document.getElementById("cfgFloodThreshold");
+  const cfgFloodIncrement = document.getElementById("cfgFloodIncrement");
   const cfgFloodHold = document.getElementById("cfgFloodHold");
-  const cfgFloodCarryOver = document.getElementById("cfgFloodCarryOver");
   const cfgFloodText = document.getElementById("cfgFloodText");
 
   const refreshStatsBtn = document.getElementById("refreshStatsBtn");
@@ -486,7 +489,7 @@
     cfgDecayStep.value = cfg.decayStep;
     cfgFloodThreshold.value = cfg.floodThreshold;
     cfgFloodHold.value = cfg.floodHoldSeconds;
-    cfgFloodCarryOver.checked = !!cfg.floodCarryOver;
+    cfgFloodIncrement.value = cfg.floodThresholdIncrement;
     cfgFloodText.value = cfg.floodText;
     renderAuthStatus();
     renderActions();
@@ -614,7 +617,7 @@
   cfgDecayStep.addEventListener("change", () => { cfg.decayStep = Number(cfgDecayStep.value)||10; saveConfig(); });
   cfgFloodThreshold.addEventListener("change", () => { cfg.floodThreshold = Number(cfgFloodThreshold.value)||10; saveConfig(); updatePetUI(); });
   cfgFloodHold.addEventListener("change", () => { cfg.floodHoldSeconds = Number(cfgFloodHold.value)||6; saveConfig(); });
-  cfgFloodCarryOver.addEventListener("change", () => { cfg.floodCarryOver = cfgFloodCarryOver.checked; saveConfig(); });
+  cfgFloodIncrement.addEventListener("change", () => { cfg.floodThresholdIncrement = Number(cfgFloodIncrement.value)||0; saveConfig(); });
   cfgFloodText.addEventListener("change", () => { cfg.floodText = cfgFloodText.value || "СОНЕЧКА ЗАЛИВАЕТ ВАС МОЛОЧКОМ"; saveConfig(); });
 
   resetPetBtn.addEventListener("click", () => {
@@ -788,7 +791,8 @@
         showBubble(`Сонечка слишком устала для молока... покормите и погладьте её! 😿`);
       } else {
         cfg.milkCans += 1; // счётчик доек до заливки — считаем именно дойки, не литры
-        startCatchRound(yieldAmount, donorName);
+        cfg.pendingMilkYield = (cfg.pendingMilkYield||0) + yieldAmount; // копится на приз для ловли при заливке
+        showBubble(`${donorName} подоил(а) Сонечку! 🥛 ${cfg.milkCans}/${cfg.floodThreshold}`);
         if(cfg.milkCans >= cfg.floodThreshold) triggerFlood();
       }
     }
@@ -797,19 +801,23 @@
   }
 
   function triggerFlood(){
-    // the counter is a count of milkings, not litres, so there's no "remainder" to
-    // carry over — floodCarryOver instead gives the next round a +1 head start
-    cfg.milkCans = cfg.floodCarryOver ? 1 : 0;
+    const prizeYield = Math.max(1, Math.round(cfg.pendingMilkYield||0));
+    cfg.milkCans = 0;
+    cfg.pendingMilkYield = 0;
+    cfg.floodThreshold = cfg.floodThreshold + Number(cfg.floodThresholdIncrement||1); // 10 -> 11 -> 12 ...
     saveConfig();
     floodText.textContent = cfg.floodText;
     floodOverlay.classList.add("show");
     playFile("sounds/flood.mp3");
     setTimeout(() => floodOverlay.classList.remove("show"), (cfg.floodHoldSeconds||6)*1000);
     updatePetUI();
+    // the catch-the-milk minigame happens once, here, at the big splash —
+    // not on every individual milking
+    startCatchRound(prizeYield);
   }
 
   let activeCatchRound = null;
-  function startCatchRound(milkAmount, donorName){
+  function startCatchRound(milkAmount){
     showBubble(`🥛 Сонечка брызгает молоком! Лови командой ${cfg.catchCommand}`);
     catchCmdLabel.textContent = cfg.catchCommand;
     catchBanner.classList.add("show");
