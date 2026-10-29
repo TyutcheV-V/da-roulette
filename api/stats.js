@@ -72,8 +72,13 @@ module.exports = async function handler(req, res) {
         return;
       }
       const key = type === "donor" ? "sonechka:donors" : "sonechka:drinkers";
-      await redis("ZINCRBY", key, Number(amount), String(name).slice(0, 64));
-      res.status(200).json({ ok: true });
+      const cleanName = String(name).slice(0, 64);
+      const zincrResult = await redis("ZINCRBY", key, Number(amount), cleanName);
+      res.status(200).json({
+        ok: true,
+        debugNameSentCharCodes: Array.from(cleanName).map(c=>c.charCodeAt(0)),
+        debugZincrResult: zincrResult,
+      });
       return;
     }
     res.status(405).end();
