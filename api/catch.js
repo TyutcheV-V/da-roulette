@@ -190,13 +190,13 @@ module.exports = async function handler(req, res) {
           res.status(200).json({ ok: true, staked: false, balance: afterStake + amount });
           return;
         }
-        // 90% — сгорает, 8% — улетает случайному зрителю, 2% — удваивается
+        // 60% — сгорает, 30% — улетает случайному зрителю, 10% — удваивается
         const roll = Math.random();
-        if (roll < 0.90) {
+        if (roll < 0.60) {
           res.status(200).json({ ok: true, staked: true, outcome: "lost", balance: afterStake });
           return;
         }
-        if (roll < 0.98) {
+        if (roll < 0.90) {
           const candidates = await redis("ZRANDMEMBER", BALANCE_KEY, 5);
           const recipient = (candidates || []).find((m) => m !== user);
           if (recipient) {
