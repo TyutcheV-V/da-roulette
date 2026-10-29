@@ -95,7 +95,7 @@
   }
   /* position:relative тут ради .gainPopup (всплывающая "+N") — он якорится на эту строку */
   .petStatItem{ position:relative; flex:1; display:flex; flex-direction:column; align-items:center; gap:2px; }
-  .petStatIcon{ font-size:17px; line-height:1; }
+  .petStatIcon{ width:32px; height:32px; object-fit:contain; filter:drop-shadow(0 1px 4px rgba(0,0,0,.5)); }
   .petStatPct{ font-size:12px; font-weight:800; color:#fff; text-shadow:0 1px 3px rgba(0,0,0,.6); }
 
   /* когда показатель критически низкий — пульсирует иконка, чтобы было
@@ -310,9 +310,9 @@
     <div id="petMilkBadge">🥛 0/10</div>
     <div id="petName">Сонечка</div>
     <div id="petStatsOverlay">
-      <div class="petStatItem" id="petHappyBar"><span id="happyLabel" class="petStatIcon">💛</span><span id="happyPct" class="petStatPct">70%</span></div>
-      <div class="petStatItem" id="petFullBar"><span id="fullLabel" class="petStatIcon">🍽</span><span id="fullPct" class="petStatPct">70%</span></div>
-      <div class="petStatItem" id="petGaugeBar"><span class="petStatIcon">🧪</span><span id="gaugePct" class="petStatPct">0%</span></div>
+      <div class="petStatItem" id="petHappyBar"><img id="happyLabel" class="petStatIcon" alt="счастье"><span id="happyPct" class="petStatPct">70%</span></div>
+      <div class="petStatItem" id="petFullBar"><img id="fullLabel" class="petStatIcon" alt="сытость"><span id="fullPct" class="petStatPct">70%</span></div>
+      <div class="petStatItem" id="petGaugeBar"><img id="gaugeLabel" class="petStatIcon" alt="молоко"><span id="gaugePct" class="petStatPct">0%</span></div>
     </div>
   </div>
 
@@ -671,6 +671,7 @@
   const petGaugeBar = document.getElementById("petGaugeBar");
   const happyLabel = document.getElementById("happyLabel");
   const fullLabel = document.getElementById("fullLabel");
+  const gaugeLabel = document.getElementById("gaugeLabel");
   const happyPctEl = document.getElementById("happyPct");
   const fullPctEl = document.getElementById("fullPct");
   const gaugePctEl = document.getElementById("gaugePct");
@@ -1105,11 +1106,23 @@
   }
 
   const CRITICAL_STAT_THRESHOLD = 25; // ниже этого иконка рядом с полоской начинает пульсировать
+  // подбирает ближайший из 5 заготовленных уровней заполнения иконки
+  // (images/icons/<prefix>_<pusto|25|50|75|100>.png)
+  function iconTier(pct){
+    const tier = Math.round(Math.max(0,Math.min(100,pct))/25)*25;
+    return tier === 0 ? "pusto" : String(tier);
+  }
+  function setStatIcon(imgEl, prefix, pct){
+    imgEl.src = `images/icons/${prefix}_${iconTier(pct)}.png`;
+  }
   function updatePetUI(){
     updateSprite();
     const happyPct = Math.max(0,Math.min(100,cfg.happiness));
     const fullPct = Math.max(0,Math.min(100,cfg.fullness));
     const gaugePct = Math.max(0,Math.min(100,cfg.milkGauge||0));
+    setStatIcon(happyLabel, "serdce", happyPct);
+    setStatIcon(fullLabel, "korm", fullPct);
+    setStatIcon(gaugeLabel, "moloko", gaugePct);
     happyPctEl.textContent = Math.round(happyPct) + "%";
     fullPctEl.textContent = Math.round(fullPct) + "%";
     gaugePctEl.textContent = Math.round(gaugePct) + "%";
