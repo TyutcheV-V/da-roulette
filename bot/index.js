@@ -79,8 +79,12 @@ client.on("message", async (channel, tags, message, self) => {
   if (text === BALANCE_COMMAND) {
     try {
       const result = await getBalance(login);
+      console.log("balance result:", JSON.stringify(result)); // временно, для диагностики
       const displayName = tags["display-name"] || tags.username;
-      client.say(channel, `@${displayName}, у тебя ${formatLiters(result.liters)} л молочка 🥛`);
+      const reply = `@${displayName}, у тебя ${formatLiters(result.liters)} л молочка 🥛`;
+      client.say(channel, reply)
+        .then((r) => console.log("say ok:", JSON.stringify(r)))
+        .catch((e) => console.error("say failed:", e));
     } catch (e) {
       console.error("balance request failed", e);
     }
