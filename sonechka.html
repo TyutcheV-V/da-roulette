@@ -553,11 +553,13 @@
     </div>
 
     <h3>Подсказка над головой</h3>
-    <div class="muted">Крутится над карточкой с советами, что писать в донат. Молчит, пока недавно были донаты — появляется только когда долго было тихо.</div>
+    <div class="muted">Время от времени всплывает над карточкой с советом, что писать в донат. Молчит, пока недавно были донаты — появляется только когда долго было тихо.</div>
     <div class="row">
       <div><label>Молчать, пока не пройдёт без донатов, минут</label><input type="number" id="cfgHintIdleMinutes" value="3" min="0"></div>
-      <div><label>Как часто крутить, сек</label><input type="number" id="cfgHintSeconds" value="45" min="5"></div>
+      <div><label>Пауза между подсказками, сек</label><input type="number" id="cfgHintGapSeconds" value="90" min="5"></div>
     </div>
+    <label>Сколько секунд держится на экране</label>
+    <input type="number" id="cfgHintShowSeconds" value="8" min="2">
 
     <h3>Статистика</h3>
     <div class="row">
@@ -661,7 +663,8 @@
       chatSadPhrases: "МНЕ ТАК ГРУСТНО(((\nПОГЛАДЬТЕ МЕНЯ, Я ОДИНОКАЯ\nНИКТО МЕНЯ НЕ ЛЮБИТ(((",
       chatMilkPhrases: "МОЛОКО РАСПИРАЕТ, ПОМОГИТЕ\nДАВНО МЕНЯ НЕ ДОИЛИ(((\nПОДОИТЕ МЕНЯ СРОЧНО",
       hintIdleMinutes: 3,            // не показывать подсказку, пока не пройдёт столько минут без донатов
-      hintRotationSeconds: 45,
+      hintGapSeconds: 90,            // пауза между подсказками (раньше она висела почти постоянно)
+      hintShowSeconds: 8,            // сколько секунд держится на экране один раз всплыв
       // runtime pet state, persisted alongside settings
       happiness: 70,
       fullness: 70,
@@ -809,7 +812,8 @@
   const cfgChatMilkPhrases = document.getElementById("cfgChatMilkPhrases");
   const testChatNagBtn = document.getElementById("testChatNagBtn");
   const cfgHintIdleMinutes = document.getElementById("cfgHintIdleMinutes");
-  const cfgHintSeconds = document.getElementById("cfgHintSeconds");
+  const cfgHintGapSeconds = document.getElementById("cfgHintGapSeconds");
+  const cfgHintShowSeconds = document.getElementById("cfgHintShowSeconds");
   const testPopupBtn = document.getElementById("testPopupBtn");
 
   const refreshStatsBtn = document.getElementById("refreshStatsBtn");
@@ -910,7 +914,8 @@
     cfgChatSadPhrases.value = cfg.chatSadPhrases;
     cfgChatMilkPhrases.value = cfg.chatMilkPhrases;
     cfgHintIdleMinutes.value = cfg.hintIdleMinutes;
-    cfgHintSeconds.value = cfg.hintRotationSeconds;
+    cfgHintGapSeconds.value = cfg.hintGapSeconds;
+    cfgHintShowSeconds.value = cfg.hintShowSeconds;
     renderAuthStatus();
     renderActions();
   }
@@ -1074,7 +1079,8 @@
   cfgChatMilkPhrases.addEventListener("change", () => { cfg.chatMilkPhrases = cfgChatMilkPhrases.value; saveConfig(); });
   testChatNagBtn.addEventListener("click", () => { requestChatNag(buildChatNagText(pickMoodCategory() || "hungry")); });
   cfgHintIdleMinutes.addEventListener("change", () => { cfg.hintIdleMinutes = Number(cfgHintIdleMinutes.value)||0; saveConfig(); });
-  cfgHintSeconds.addEventListener("change", () => { cfg.hintRotationSeconds = Number(cfgHintSeconds.value)||45; saveConfig(); });
+  cfgHintGapSeconds.addEventListener("change", () => { cfg.hintGapSeconds = Number(cfgHintGapSeconds.value)||90; saveConfig(); scheduleNextHint(); });
+  cfgHintShowSeconds.addEventListener("change", () => { cfg.hintShowSeconds = Number(cfgHintShowSeconds.value)||8; saveConfig(); });
   testPopupBtn.addEventListener("click", () => showMoodPopup());
 
   resetPetBtn.addEventListener("click", () => {
@@ -1667,6 +1673,13 @@
     return hints;
   }
   let hintIdx = 0;
+  let hintTimer = null;
+  // сама подсказка всплывает на hintShowSeconds и пропадает — следующая не
+  // раньше чем через hintGapSeconds ПОСЛЕ этого (а не почти без пауз, как было)
+  function scheduleNextHint(){
+    clearTimeout(hintTimer);
+    hintTimer = setTimeout(() => { rotateHint(); scheduleNextHint(); }, Math.max(5, Number(cfg.hintGapSeconds||90))*1000);
+  }
   function rotateHint(){
     if(petBubble.classList.contains("show")) return; // не перебиваем активное сообщение
     const idleMs = Date.now() - (cfg.lastInteractionAt||0);
@@ -1678,7 +1691,7 @@
     hintDetail.textContent = hints[hintIdx].detail;
     hintBubble.classList.add("show");
     clampBubbleToStage(hintBubble);
-    setTimeout(() => hintBubble.classList.remove("show"), Math.max(3000, (cfg.hintRotationSeconds||45)*1000 - 2000));
+    setTimeout(() => hintBubble.classList.remove("show"), Math.max(2, Number(cfg.hintShowSeconds||8))*1000);
   }
 
   // ---------- test tools ----------
@@ -1764,7 +1777,7 @@
   fetchStats();
   if(!isDockSettings){
     scheduleNextPopup();
-    setInterval(rotateHint, Math.max(5000, (cfg.hintRotationSeconds||45)*1000));
+    scheduleNextHint();
     fetchPendingRequests();
     setInterval(fetchPendingRequests, 15*1000);
   }
