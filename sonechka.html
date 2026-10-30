@@ -4,6 +4,9 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Сонечка</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Comfortaa:wght@500;600;700&display=swap" rel="stylesheet">
 <style>
   :root{
     --accent: #ffd24d;
@@ -168,13 +171,18 @@
     position:absolute; left:50%; bottom:100%; margin-bottom:-6px;
     width:390px; aspect-ratio:1536/1024; box-sizing:border-box;
     background:url(images/speech-bubble-cloud.png) center/100% 100% no-repeat;
-    display:flex; align-items:center; justify-content:center;
+    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4px;
     padding:22% 16% 30% 20%; /* безопасная зона облака, посчитана по непрозрачным пикселям картинки */
-    color:#5a1030; font-size:13px; font-weight:700; line-height:1.25;
+    font-family:'Comfortaa', cursive;
     text-align:center; opacity:0; pointer-events:none;
     transform:translateX(-38%) translateY(8px) scale(.7);
     transition:opacity .2s ease;
   }
+  /* реплика-реакция (донат на кормление/ласку/дойку) — одна крупная строка */
+  #petBubble{ color:#8a0e4a; font-weight:700; font-size:16px; line-height:1.3; }
+  /* подсказка — крупный вопрос сверху, мелкая приписка про донат снизу */
+  #hintMain{ color:#8a0e4a; font-weight:700; font-size:17px; line-height:1.25; }
+  #hintDetail{ color:#7a4060; font-weight:600; font-size:11.5px; line-height:1.3; }
   #petBubble.show, #hintBubble.show{ opacity:1; animation:bubblePop .4s cubic-bezier(.34,1.56,.64,1) forwards; }
   @keyframes bubblePop{
     0%{ transform:translateX(-38%) translateY(8px) scale(.6); opacity:0; }
@@ -349,7 +357,7 @@
     </div>
     <div id="petNameHeader"><span class="petHeaderHeart">💗</span>Сонечка<span class="petHeaderHeart">💗</span></div>
     <div id="petBubble"></div>
-    <div id="hintBubble"></div>
+    <div id="hintBubble"><div id="hintMain"></div><div id="hintDetail"></div></div>
     <div id="milkTubeWrap">
       <div id="milkTube"><div id="milkTubeFill"></div></div>
       <img id="milkBucketIcon" src="images/icons/moloko_100.png" alt="бутылка молока">
@@ -716,6 +724,8 @@
   const milkTubeFill = document.getElementById("milkTubeFill");
   const petBubble = document.getElementById("petBubble");
   const hintBubble = document.getElementById("hintBubble");
+  const hintMain = document.getElementById("hintMain");
+  const hintDetail = document.getElementById("hintDetail");
   const dropLayer = document.getElementById("dropLayer");
   const burstWarning = document.getElementById("burstWarning");
   const catchWinnersBanner = document.getElementById("catchWinnersBanner");
@@ -1636,17 +1646,18 @@
   }
 
   // ---------- idle hint bubble — cycles tips for each action + the catch command ----------
+  // каждая подсказка — {main: крупный вопрос, detail: мелкая приписка про донат}
   function buildHints(){
     const hints = (cfg.actions||[]).filter(a => a.enabled !== false).map(a => {
       const kw = parseKeywords(a.keywords)[0];
       if(!kw) return null;
       const verb = a.effect === "feed" ? "покормить" : a.effect === "pet" ? "погладить" : "подоить";
-      return `Хотите ${verb} меня? Напишите донат от ${Math.round(cfg.donationMinAmount||100)}₽ со словом «${kw}»`;
+      return { main: `Хотите ${verb} меня?`, detail: `Донат от ${Math.round(cfg.donationMinAmount||100)}₽ со словом «${kw}»` };
     }).filter(Boolean);
-    hints.push(`В момент заливки ловите молоко командой ${cfg.catchCommand} в чате!`);
-    hints.push(`Накопили молочко? Закажите просьбу: ${cfg.requestCommand} <текст> (-${Math.round(cfg.requestCost||1)} л)`);
+    hints.push({ main: "Ловите молоко!", detail: `В момент заливки — команда ${cfg.catchCommand} в чате` });
+    hints.push({ main: "Накопили молочко?", detail: `Закажите просьбу: ${cfg.requestCommand} <текст> (-${Math.round(cfg.requestCost||1)} л)` });
     const hasMilkAction = (cfg.actions||[]).some(a => a.enabled !== false && a.effect === "milk");
-    if(hasMilkAction) hints.push(`Донатите на дойку под именем, которым пишете в чат — иначе кешбек молочка не найдётся по !молочко!`);
+    if(hasMilkAction) hints.push({ main: "Важно для доната на дойку!", detail: "Пишите то же имя, что и в чате — иначе кешбек не найдётся по !молочко" });
     return hints;
   }
   let hintIdx = 0;
@@ -1657,7 +1668,8 @@
     const hints = buildHints();
     if(!hints.length) return;
     hintIdx = (hintIdx + 1) % hints.length;
-    hintBubble.textContent = hints[hintIdx];
+    hintMain.textContent = hints[hintIdx].main;
+    hintDetail.textContent = hints[hintIdx].detail;
     hintBubble.classList.add("show");
     clampBubbleToStage(hintBubble);
     setTimeout(() => hintBubble.classList.remove("show"), Math.max(3000, (cfg.hintRotationSeconds||45)*1000 - 2000));
