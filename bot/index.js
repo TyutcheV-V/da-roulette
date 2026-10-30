@@ -113,10 +113,10 @@ client.on("message", async (channel, tags, message, self) => {
 
   if (text === SHAKE_COMMAND || text.startsWith(SHAKE_COMMAND + " ")) {
     const argStr = original.slice(SHAKE_COMMAND.length).trim().replace(",", ".");
-    const amount = parseFloat(argStr);
+    const amount = Number(argStr);
     const displayName = tags["display-name"] || tags.username;
-    if (!(amount > 0)) {
-      await client.say(channel, `@${displayName}, укажи сколько взболтать: ${SHAKE_COMMAND} <число>`);
+    if (!(amount > 0) || !Number.isInteger(amount)) {
+      await client.say(channel, `@${displayName}, только целыми литрами: ${SHAKE_COMMAND} <1, 2, 3...>`);
       return;
     }
     try {

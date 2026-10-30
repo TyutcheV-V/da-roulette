@@ -203,7 +203,7 @@ module.exports = async function handler(req, res) {
         }
         const user = String(body.user || "").toLowerCase().trim();
         const amount = Number(body.amount);
-        if (!user || !(amount > 0)) { res.status(400).json({ error: "missing user or amount" }); return; }
+        if (!user || !(amount > 0) || !Number.isInteger(amount)) { res.status(400).json({ error: "missing user or non-integer amount" }); return; }
         const afterStake = Number(await redis("ZINCRBY", BALANCE_KEY, -amount, user));
         if (afterStake < 0) {
           await redis("ZINCRBY", BALANCE_KEY, amount, user);
