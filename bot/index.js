@@ -5,7 +5,7 @@
 // credentials itself). Answers "!молочко" by looking up the sender's balance,
 // "!просьба <текст>" spends balance to queue an ask for the widget, and
 // "!взболтать <N>" gambles N litres on a random outcome (backend decides it),
-// and "!сонечка" reports her last-known happiness/fullness/milk gauge.
+// and "!какона" reports her last-known happiness/fullness/milk gauge.
 const tmi = require("tmi.js");
 
 const BOT_USERNAME = requireEnv("TWITCH_BOT_USERNAME");
@@ -18,7 +18,7 @@ const BALANCE_COMMAND = (process.env.BALANCE_COMMAND || "!молочко").trim(
 const REQUEST_COMMAND = (process.env.REQUEST_COMMAND || "!просьба").trim().toLowerCase();
 const REQUEST_COST = Math.max(1, Math.round(Number(process.env.REQUEST_COST) || 1));
 const SHAKE_COMMAND = (process.env.SHAKE_COMMAND || "!взболтать").trim().toLowerCase();
-const STATUS_COMMAND = (process.env.STATUS_COMMAND || "!сонечка").trim().toLowerCase();
+const STATUS_COMMAND = (process.env.STATUS_COMMAND || "!какона").trim().toLowerCase();
 
 function requireEnv(name) {
   const v = process.env[name];
