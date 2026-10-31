@@ -38,7 +38,7 @@
      JS via cfg.posX/posY — works at any OBS source resolution and is how
      drag-to-reposition (arrange mode) writes new coordinates */
   #petCard{
-    position:absolute; left:88%; top:85%; transform:translate(-50%,-50%);
+    position:absolute; left:88%; top:85%; transform:translate(-50%,-50%) scale(var(--pet-scale, 1));
     width:190px; height:253px; text-align:center;
     touch-action:none;
   }
@@ -81,8 +81,9 @@
   #petSpriteFallback{ font-size:56px; line-height:1; }
 
   /* decorative floating hearts, purely visual */
+  /* тоже самое место, что включает/выключает режим перетаскивания+масштаба */
   .petHeartDeco{
-    position:absolute; font-size:16px; pointer-events:none; filter:drop-shadow(0 1px 3px rgba(0,0,0,.6));
+    position:absolute; font-size:16px; cursor:pointer; filter:drop-shadow(0 1px 3px rgba(0,0,0,.6));
     animation: heartFloat 3.6s ease-in-out infinite;
   }
   @keyframes heartFloat{ 0%,100%{ transform:translateY(0) scale(1); opacity:.85; } 50%{ transform:translateY(-6px) scale(1.12); opacity:1; } }
@@ -163,9 +164,9 @@
   /* shake right before the flood, while she's "about to burst" */
   #petCard.shaking{ animation: petShake .32s ease-in-out infinite; }
   @keyframes petShake{
-    0%,100%{ transform:translate(-50%,-50%) rotate(0deg); }
-    25%{ transform:translate(calc(-50% - 3px),-50%) rotate(-2deg); }
-    75%{ transform:translate(calc(-50% + 3px),-50%) rotate(2deg); }
+    0%,100%{ transform:translate(-50%,-50%) scale(var(--pet-scale, 1)) rotate(0deg); }
+    25%{ transform:translate(calc(-50% - 3px),-50%) scale(var(--pet-scale, 1)) rotate(-2deg); }
+    75%{ transform:translate(calc(-50% + 3px),-50%) scale(var(--pet-scale, 1)) rotate(2deg); }
   }
 
   /* ---------- speech bubble (now a child of #petCard, so it follows it when dragged) ----------
@@ -412,7 +413,7 @@
     <h3>Расположение</h3>
     <div class="muted">Источник в OBS должен быть на весь холст (например 1920×1080) — иначе заливка молоком не займёт весь экран, а Сонечка всё равно встанет в нужное место за счёт отступов.</div>
     <button id="arrangeModeBtn" style="margin-top:6px;">Включить перетаскивание</button>
-    <div class="muted" id="arrangeHint" style="display:none;">Режим включён — тащи карточку Сонечки мышкой (через Interact в OBS) куда нужно. Выключи режим, когда закончишь.</div>
+    <div class="muted" id="arrangeHint" style="display:none;">Режим включён — тащи карточку Сонечки мышкой (через Interact в OBS) куда нужно, крути колёсико мыши над ней, чтобы изменить размер. Можно также включить/выключить режим кликом по сердечку на самой карточке. Выключи режим, когда закончишь.</div>
     <div class="row" style="margin-top:8px;">
       <button class="posPresetBtn" data-x="12" data-y="15">↖ Верх-лево</button>
       <button class="posPresetBtn" data-x="88" data-y="15">↗ Верх-право</button>
@@ -425,6 +426,8 @@
       <div><label>X, % слева</label><input type="number" id="cfgPosX" min="0" max="100" value="88"></div>
       <div><label>Y, % сверху</label><input type="number" id="cfgPosY" min="0" max="100" value="85"></div>
     </div>
+    <label>Масштаб, %</label>
+    <input type="number" id="cfgScale" min="40" max="250" step="5" value="100">
 
     <h3>Звук</h3>
     <button id="muteToggleBtn" class="primary" style="width:100%;">🔊 Выключить звук</button>
@@ -615,6 +618,7 @@
     return {
       posX: 88,
       posY: 85,
+      scale: 1, // масштаб всей карточки (крутится колёсиком мыши в режиме перетаскивания)
       litersPerFlood: 10, // один бидон = столько литров разбрызгивается
       donationMinAmount: 50,
       donationMaxAmount: 1000,   // донат такой суммы (и больше) даёт максимальный эффект
@@ -766,6 +770,7 @@
   const arrangeModeBtn = document.getElementById("arrangeModeBtn");
   const arrangeHint = document.getElementById("arrangeHint");
   const cfgPosX = document.getElementById("cfgPosX");
+  const cfgScale = document.getElementById("cfgScale");
   const cfgPosY = document.getElementById("cfgPosY");
   const muteToggleBtn = document.getElementById("muteToggleBtn");
   const cfgSoundVolume = document.getElementById("cfgSoundVolume");
@@ -877,6 +882,7 @@
     cfgActionDelay.value = cfg.actionDelaySeconds;
     cfgPosX.value = Math.round(cfg.posX);
     cfgPosY.value = Math.round(cfg.posY);
+    cfgScale.value = Math.round((cfg.scale||1)*100);
     updateMuteBtn();
     cfgSoundVolume.value = cfg.soundVolume;
     cfgFeedFullness.value = cfg.feedFullnessStep;
@@ -993,9 +999,11 @@
   function applyPetPosition(){
     petCard.style.left = cfg.posX + "%";
     petCard.style.top = cfg.posY + "%";
+    petCard.style.setProperty("--pet-scale", cfg.scale||1);
   }
   cfgPosX.addEventListener("change", () => { cfg.posX = Math.max(0,Math.min(100,Number(cfgPosX.value)||0)); saveConfig(); applyPetPosition(); });
   cfgPosY.addEventListener("change", () => { cfg.posY = Math.max(0,Math.min(100,Number(cfgPosY.value)||0)); saveConfig(); applyPetPosition(); });
+  cfgScale.addEventListener("change", () => { cfg.scale = Math.max(0.4,Math.min(2.5,(Number(cfgScale.value)||100)/100)); saveConfig(); applyPetPosition(); cfgScale.value = Math.round(cfg.scale*100); });
 
   document.querySelectorAll(".posPresetBtn").forEach(btn => {
     btn.addEventListener("click", () => {
@@ -1006,12 +1014,25 @@
   });
 
   let arrangeMode = false;
-  arrangeModeBtn.addEventListener("click", () => {
+  // одна функция — вызывается и кнопкой в настройках, и кликом по сердечку на самой карточке
+  function toggleArrangeMode(){
     arrangeMode = !arrangeMode;
     petCard.classList.toggle("arrangeMode", arrangeMode);
     arrangeHint.style.display = arrangeMode ? "block" : "none";
     arrangeModeBtn.textContent = arrangeMode ? "Выключить перетаскивание" : "Включить перетаскивание";
-  });
+  }
+  arrangeModeBtn.addEventListener("click", toggleArrangeMode);
+  document.querySelectorAll(".petHeartDeco").forEach(h => h.addEventListener("click", (e) => { e.stopPropagation(); toggleArrangeMode(); }));
+
+  // в режиме перетаскивания колёсико мыши над карточкой меняет масштаб
+  petCard.addEventListener("wheel", (e) => {
+    if(!arrangeMode) return;
+    e.preventDefault();
+    cfg.scale = Math.max(0.4, Math.min(2.5, (cfg.scale||1) + (e.deltaY < 0 ? 0.05 : -0.05)));
+    applyPetPosition();
+    saveConfig();
+    cfgScale.value = Math.round(cfg.scale*100);
+  }, { passive:false });
 
   let dragging = false;
   petCard.addEventListener("pointerdown", (e) => {
