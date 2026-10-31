@@ -136,6 +136,13 @@
   .petStatIcon{ width:46px; height:46px; object-fit:contain; filter:drop-shadow(0 1px 4px rgba(0,0,0,.5)); }
   /* иконка радости (сердце) — тоже самое место, что включает/выключает режим перетаскивания+масштаба */
   #happyLabel{ cursor:pointer; }
+  /* иконка сытости (миска) — включает/выключает хеллуинский фильтр на всю сцену */
+  #fullLabel{ cursor:pointer; }
+  /* временное хеллуинское оформление — один фильтр на всю сцену красит
+     вообще все цвета сразу (розовое->оранжевое/фиолетовое, синее->зелёное
+     и т.д.), ничего по отдельности не перекрашиваем — легко убрать потом,
+     просто удалив этот блок и переключалку */
+  #stage.halloweenMode{ filter: hue-rotate(55deg) saturate(1.35) brightness(.97) contrast(1.05); }
   .petStatPct{ font-size:13px; font-weight:800; color:#fff; text-shadow:0 1px 3px rgba(0,0,0,.6); }
 
   /* когда показатель критически низкий — пульсирует иконка, чтобы было
@@ -620,6 +627,7 @@
       posX: 88,
       posY: 85,
       scale: 1, // масштаб всей карточки (крутится колёсиком мыши в режиме перетаскивания)
+      halloweenMode: false, // временное — переключается кликом по миске корма
       litersPerFlood: 10, // один бидон = столько литров разбрызгивается
       donationMinAmount: 50,
       donationMaxAmount: 1000,   // донат такой суммы (и больше) даёт максимальный эффект
@@ -1030,6 +1038,15 @@
   // из-за этого включить получалось, а выключить повторным кликом нет)
   happyLabel.addEventListener("pointerdown", (e) => { e.stopPropagation(); });
   happyLabel.addEventListener("click", (e) => { e.stopPropagation(); toggleArrangeMode(); });
+
+  // временный хеллуинский режим — клик по миске корма
+  function applyHalloweenMode(){
+    document.getElementById("stage").classList.toggle("halloweenMode", !!cfg.halloweenMode);
+    document.querySelectorAll(".petHeartDeco").forEach((h,i) => { h.textContent = cfg.halloweenMode ? (i===0?"🦇":"🎃") : (i===0?"💗":"💞"); });
+    document.querySelectorAll(".petHeaderHeart").forEach(h => { h.textContent = cfg.halloweenMode ? "🎃" : "💗"; });
+  }
+  fullLabel.addEventListener("pointerdown", (e) => { e.stopPropagation(); });
+  fullLabel.addEventListener("click", (e) => { e.stopPropagation(); cfg.halloweenMode = !cfg.halloweenMode; saveConfig(); applyHalloweenMode(); });
 
   // в режиме перетаскивания колёсико мыши над карточкой меняет масштаб
   petCard.addEventListener("wheel", (e) => {
@@ -1797,6 +1814,7 @@
 
   // ---------- init ----------
   applyPetPosition();
+  applyHalloweenMode();
   updatePetUI();
   applyDecayIfDue();
   renderSettingsForm();
