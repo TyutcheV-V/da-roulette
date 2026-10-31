@@ -81,9 +81,8 @@
   #petSpriteFallback{ font-size:56px; line-height:1; }
 
   /* decorative floating hearts, purely visual */
-  /* тоже самое место, что включает/выключает режим перетаскивания+масштаба */
   .petHeartDeco{
-    position:absolute; font-size:16px; cursor:pointer; filter:drop-shadow(0 1px 3px rgba(0,0,0,.6));
+    position:absolute; font-size:16px; pointer-events:none; filter:drop-shadow(0 1px 3px rgba(0,0,0,.6));
     animation: heartFloat 3.6s ease-in-out infinite;
   }
   @keyframes heartFloat{ 0%,100%{ transform:translateY(0) scale(1); opacity:.85; } 50%{ transform:translateY(-6px) scale(1.12); opacity:1; } }
@@ -135,6 +134,8 @@
   /* position:relative тут ради .gainPopup (всплывающая "+N") — он якорится на эту строку */
   .petStatItem{ position:relative; flex:1; display:flex; flex-direction:column; align-items:center; gap:2px; }
   .petStatIcon{ width:46px; height:46px; object-fit:contain; filter:drop-shadow(0 1px 4px rgba(0,0,0,.5)); }
+  /* иконка радости (сердце) — тоже самое место, что включает/выключает режим перетаскивания+масштаба */
+  #happyLabel{ cursor:pointer; }
   .petStatPct{ font-size:13px; font-weight:800; color:#fff; text-shadow:0 1px 3px rgba(0,0,0,.6); }
 
   /* когда показатель критически низкий — пульсирует иконка, чтобы было
@@ -413,7 +414,7 @@
     <h3>Расположение</h3>
     <div class="muted">Источник в OBS должен быть на весь холст (например 1920×1080) — иначе заливка молоком не займёт весь экран, а Сонечка всё равно встанет в нужное место за счёт отступов.</div>
     <button id="arrangeModeBtn" style="margin-top:6px;">Включить перетаскивание</button>
-    <div class="muted" id="arrangeHint" style="display:none;">Режим включён — тащи карточку Сонечки мышкой (через Interact в OBS) куда нужно, крути колёсико мыши над ней, чтобы изменить размер. Можно также включить/выключить режим кликом по сердечку на самой карточке. Выключи режим, когда закончишь.</div>
+    <div class="muted" id="arrangeHint" style="display:none;">Режим включён — тащи карточку Сонечки мышкой (через Interact в OBS) куда нужно, крути колёсико мыши над ней, чтобы изменить размер. Можно также включить/выключить режим кликом по сердечку (иконке радости) внизу карточки. Выключи режим, когда закончишь.</div>
     <div class="row" style="margin-top:8px;">
       <button class="posPresetBtn" data-x="12" data-y="15">↖ Верх-лево</button>
       <button class="posPresetBtn" data-x="88" data-y="15">↗ Верх-право</button>
@@ -1022,7 +1023,13 @@
     arrangeModeBtn.textContent = arrangeMode ? "Выключить перетаскивание" : "Включить перетаскивание";
   }
   arrangeModeBtn.addEventListener("click", toggleArrangeMode);
-  document.querySelectorAll(".petHeartDeco").forEach(h => h.addEventListener("click", (e) => { e.stopPropagation(); toggleArrangeMode(); }));
+  // важно гасить именно pointerdown, а не только click — иначе событие
+  // проваливается в обработчик перетаскивания у #petCard (он ставит
+  // pointer capture на СЕБЯ на любой pointerdown внутри карточки, пока
+  // включён режим, и тогда клик по иконке больше не доходит до неё —
+  // из-за этого включить получалось, а выключить повторным кликом нет)
+  happyLabel.addEventListener("pointerdown", (e) => { e.stopPropagation(); });
+  happyLabel.addEventListener("click", (e) => { e.stopPropagation(); toggleArrangeMode(); });
 
   // в режиме перетаскивания колёсико мыши над карточкой меняет масштаб
   petCard.addEventListener("wheel", (e) => {
