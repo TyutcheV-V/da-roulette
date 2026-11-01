@@ -4,9 +4,6 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Сонечка</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Comfortaa:wght@500;600;700&display=swap" rel="stylesheet">
 <style>
   :root{
     --accent: #ffd24d;
@@ -188,7 +185,7 @@
     background:url(images/speech-bubble-cloud.png) center/100% 100% no-repeat;
     display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4px;
     padding:22% 16% 30% 20%; /* безопасная зона облака, посчитана по непрозрачным пикселям картинки */
-    font-family:'Comfortaa', cursive;
+    font-family:'Trebuchet MS', 'Verdana', 'Segoe UI', sans-serif; /* системный, без внешней загрузки шрифта */
     text-align:center; opacity:0; pointer-events:none;
     transform:translateX(-38%) translateY(8px) scale(.7);
     transition:opacity .2s ease;
