@@ -394,6 +394,15 @@
     </div>
     <div id="authStatus">не подключено</div>
 
+    <h3>iHAQ Donate</h3>
+    <div class="muted">Дополнительный источник донатов (работает одновременно с DonationAlerts, не вместо).</div>
+    <label>API токен интеграции</label>
+    <input type="text" id="cfgIhaqToken" placeholder="токен из настроек интеграции на ihaqdonate.com">
+    <div class="row" style="margin-top:8px;">
+      <button id="testIhaqBtn">Тестовый донат iHAQ</button>
+    </div>
+    <div id="ihaqTestResult"></div>
+
     <h3>Ловля молока (ведёт бот в чате)</h3>
     <div class="muted">Саму команду в чате слушает отдельный Twitch-бот (не этот виджет) — он и начисляет литры. Значения ниже должны совпадать с тем, что настроено у бота.</div>
     <label>Литров за один бидон</label>
@@ -612,6 +621,7 @@
   </div>
 </div>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.8.1/socket.io.min.js"></script>
 <script>
 (function(){
   "use strict";
@@ -720,10 +730,11 @@
         accessToken: parsed.accessToken || "",
         tokenExpiresAt: parsed.tokenExpiresAt || 0,
         userId: parsed.userId || null,
-        proxyUrl: parsed.proxyUrl || ""
+        proxyUrl: parsed.proxyUrl || "",
+        ihaqToken: parsed.ihaqToken || ""
       };
     }catch(e){
-      return { clientId:"", accessToken:"", tokenExpiresAt:0, userId:null, proxyUrl:"" };
+      return { clientId:"", accessToken:"", tokenExpiresAt:0, userId:null, proxyUrl:"", ihaqToken:"" };
     }
   }
   function saveDA(patch){
@@ -773,6 +784,9 @@
   const cfgClientId = document.getElementById("cfgClientId");
   const redirectUriShow = document.getElementById("redirectUriShow");
   const cfgProxyUrl = document.getElementById("cfgProxyUrl");
+  const cfgIhaqToken = document.getElementById("cfgIhaqToken");
+  const testIhaqBtn = document.getElementById("testIhaqBtn");
+  const ihaqTestResult = document.getElementById("ihaqTestResult");
   const loginBtn = document.getElementById("loginBtn");
   const logoutBtn = document.getElementById("logoutBtn");
   const authStatus = document.getElementById("authStatus");
@@ -893,6 +907,7 @@
     da = loadDA();
     cfgClientId.value = da.clientId || "";
     cfgProxyUrl.value = da.proxyUrl || "";
+    cfgIhaqToken.value = da.ihaqToken || "";
     cfgLitersPerFlood.value = cfg.litersPerFlood;
     cfgCatchCommand.value = cfg.catchCommand;
     cfgCatchWindow.value = cfg.catchWindowSeconds;
@@ -1009,6 +1024,7 @@
 
   cfgClientId.addEventListener("change", () => { saveDA({clientId: cfgClientId.value.trim()}); da = loadDA(); });
   cfgProxyUrl.addEventListener("change", () => { saveDA({proxyUrl: cfgProxyUrl.value.trim().replace(/\/$/,"")}); da = loadDA(); });
+  cfgIhaqToken.addEventListener("change", () => { saveDA({ihaqToken: cfgIhaqToken.value.trim()}); da = loadDA(); connectIhaq(); });
   cfgLitersPerFlood.addEventListener("change", () => { cfg.litersPerFlood = Math.max(1, Number(cfgLitersPerFlood.value)||10); saveConfig(); });
   cfgCatchCommand.addEventListener("change", () => { cfg.catchCommand = cfgCatchCommand.value.trim() || "!ловлю"; saveConfig(); });
   cfgCatchWindow.addEventListener("change", () => { cfg.catchWindowSeconds = Number(cfgCatchWindow.value)||10; saveConfig(); });
@@ -1852,6 +1868,43 @@
     }, reconnectDelay);
   }
 
+  // ---------- iHAQ Donate realtime (additional donation source, same handlePetDonation) ----------
+  let ihaqSocket = null;
+  function connectIhaq(){
+    da = loadDA();
+    if(ihaqSocket){ try{ ihaqSocket.disconnect(); }catch(e){} ihaqSocket = null; }
+    const token = (da.ihaqToken||"").trim();
+    if(!token) return;
+    if(typeof io === "undefined"){ console.error("socket.io-client failed to load"); return; }
+    ihaqSocket = io("wss://ihaqdonate.com", { path: "/ws/integrations/socket.io/v1/" + token });
+    ihaqSocket.on("message", (payload) => {
+      if(!payload || payload.type !== "donation" || !payload.message) return;
+      const msg = payload.message;
+      if(msg.typeId !== 1 && msg.typeId !== 100) return;
+      const amount = Number(msg.amount);
+      if(amount && !Number.isNaN(amount)) handlePetDonation(amount, msg.message, msg.donatorName);
+    });
+    ihaqSocket.on("connect_error", (e) => console.error("iHAQ connect error", e));
+  }
+  testIhaqBtn.addEventListener("click", async () => {
+    const token = (cfgIhaqToken.value||"").trim();
+    if(!token){ ihaqTestResult.textContent = "Сначала впиши токен."; return; }
+    testIhaqBtn.disabled = true;
+    ihaqTestResult.textContent = "Отправляю...";
+    const url = da.proxyUrl
+      ? `${da.proxyUrl}/api/ihaq-proxy?token=${encodeURIComponent(token)}`
+      : `https://ihaqdonate.com/api/v1/integration/test/${encodeURIComponent(token)}`;
+    try{
+      const r = await fetch(url);
+      ihaqTestResult.textContent = r.ok ? "Отправлено — проверь виджет." : `Ошибка: ${r.status}`;
+    }catch(e){
+      ihaqTestResult.textContent = da.proxyUrl
+        ? "Не получилось — проверь токен или соединение."
+        : "Не получилось (CORS) — укажи адрес прокси выше.";
+    }
+    testIhaqBtn.disabled = false;
+  });
+
   // ---------- init ----------
   applyPetPosition();
   applyHalloweenMode();
@@ -1860,6 +1913,7 @@
   renderSettingsForm();
   if(isDockSettings) settingsPanel.classList.add("open");
   connectRealtime();
+  connectIhaq();
   fetchStats();
   if(!isDockSettings){
     scheduleNextPopup();
