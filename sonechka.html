@@ -569,6 +569,16 @@
     <label>Сколько секунд держится на экране</label>
     <input type="number" id="cfgHintShowSeconds" value="8" min="2">
 
+    <h3>Выдать молоко зрителю</h3>
+    <div class="muted">Начислить (или списать, если сумма отрицательная) литры напрямую на баланс — например, чтобы вручную поправить задвоенный/неправильный ник. Секрет — тот же CATCH_SECRET, что в Render у бота; хранится только у тебя в браузере, никуда больше не уходит.</div>
+    <input type="password" id="cfgAdminSecret" placeholder="Секрет бота (CATCH_SECRET)">
+    <div class="row" style="margin-top:6px;">
+      <input type="text" id="giveMilkUser" placeholder="Твич-логин зрителя">
+      <input type="number" id="giveMilkAmount" placeholder="Литров (можно отрицательно)" value="1">
+    </div>
+    <button id="giveMilkBtn" class="primary" style="width:100%; margin-top:6px;">Выдать молоко</button>
+    <div class="muted" id="giveMilkResult" style="margin-top:4px;"></div>
+
     <h3>Статистика</h3>
     <div class="row">
       <button id="refreshStatsBtn">Обновить статистику</button>
@@ -625,6 +635,7 @@
       posY: 85,
       scale: 1, // масштаб всей карточки (крутится колёсиком мыши в режиме перетаскивания)
       halloweenMode: false, // временное — переключается кликом по миске корма
+      adminSecret: "", // CATCH_SECRET для выдачи молока из панели — только в этом браузере
       litersPerFlood: 10, // один бидон = столько литров разбрызгивается
       donationMinAmount: 50,
       donationMaxAmount: 1000,   // донат такой суммы (и больше) даёт максимальный эффект
@@ -828,6 +839,11 @@
   const testPopupBtn = document.getElementById("testPopupBtn");
 
   const refreshStatsBtn = document.getElementById("refreshStatsBtn");
+  const cfgAdminSecret = document.getElementById("cfgAdminSecret");
+  const giveMilkUser = document.getElementById("giveMilkUser");
+  const giveMilkAmount = document.getElementById("giveMilkAmount");
+  const giveMilkBtn = document.getElementById("giveMilkBtn");
+  const giveMilkResult = document.getElementById("giveMilkResult");
   const resetPetBtn = document.getElementById("resetPetBtn");
   const statsDonors = document.getElementById("statsDonors");
   const statsDrinkers = document.getElementById("statsDrinkers");
@@ -889,6 +905,7 @@
     cfgPosX.value = Math.round(cfg.posX);
     cfgPosY.value = Math.round(cfg.posY);
     cfgScale.value = Math.round((cfg.scale||1)*100);
+    cfgAdminSecret.value = cfg.adminSecret||"";
     updateMuteBtn();
     cfgSoundVolume.value = cfg.soundVolume;
     cfgFeedFullness.value = cfg.feedFullnessStep;
@@ -1408,6 +1425,32 @@
     });
   }
   refreshStatsBtn.addEventListener("click", fetchStats);
+  cfgAdminSecret.addEventListener("change", () => { cfg.adminSecret = cfgAdminSecret.value.trim(); saveConfig(); });
+  giveMilkBtn.addEventListener("click", async () => {
+    const url = catchEndpoint();
+    const secret = (cfg.adminSecret||"").trim();
+    const user = giveMilkUser.value.trim().toLowerCase();
+    const delta = Number(giveMilkAmount.value);
+    giveMilkResult.textContent = "";
+    if(!url){ giveMilkResult.textContent = "Сначала укажи прокси-URL выше."; return; }
+    if(!secret){ giveMilkResult.textContent = "Впиши секрет бота."; return; }
+    if(!user || !delta){ giveMilkResult.textContent = "Укажи логин и ненулевую сумму."; return; }
+    giveMilkBtn.disabled = true;
+    try{
+      const r = await fetch(url, {
+        method:"POST", headers:{ "Content-Type":"application/json", "X-Bot-Secret": secret },
+        body: JSON.stringify({ action:"adjust", user, delta })
+      });
+      const json = await r.json();
+      if(!r.ok){ giveMilkResult.textContent = r.status === 401 ? "Неверный секрет." : `Ошибка: ${json.error||r.status}`; }
+      else{
+        const bal = Number(json.balance)||0;
+        giveMilkResult.textContent = `Готово — у ${user} теперь ${Number.isInteger(bal) ? bal : bal.toFixed(1)} л.`;
+        fetchStats();
+      }
+    }catch(e){ giveMilkResult.textContent = "Не получилось — проверь соединение."; }
+    giveMilkBtn.disabled = false;
+  });
 
   // ---------- pet action logic ----------
   function handlePetDonation(amount, rawMessage, donorName){
