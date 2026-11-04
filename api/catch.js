@@ -240,7 +240,11 @@ module.exports = async function handler(req, res) {
           res.status(401).json({ error: "unauthorized" });
           return;
         }
-        const user = String(body.user || "").toLowerCase().trim();
+        // raw:true пропускает lowercase — нужно для точечной чистки задвоенных
+        // записей (один и тот же зритель оказался под двумя регистрами одного
+        // имени), иначе adjust всегда бьёт по уже-нижнему варианту и два таких
+        // вызова подряд (списать с "A", начислить "a") просто гасят друг друга
+        const user = body.raw === true ? String(body.user || "").trim() : String(body.user || "").toLowerCase().trim();
         const delta = Number(body.delta);
         if (!user || !delta) { res.status(400).json({ error: "missing user or delta" }); return; }
         const balance = await redis("ZINCRBY", BALANCE_KEY, delta, user);
