@@ -406,6 +406,7 @@
   const SPIN_RESULT_KEY = "da_roulette_spin_result_v1";
   const HISTORY_SYNC_KEY = "da_roulette_history_sync_v1";
   const IHAQ_STATUS_KEY = "da_roulette_ihaq_status_v1";
+  const IHAQ_TOKEN_SYNC_KEY = "da_roulette_ihaq_token_sync_v1";
 
   const urlParams = new URLSearchParams(location.search);
   const viewMode = urlParams.get("view"); // null/other = full widget, "progress", "roulette"
@@ -925,7 +926,15 @@
 
   cfgClientId.addEventListener("change", () => { cfg.clientId = cfgClientId.value.trim(); saveConfig(); });
   cfgProxyUrl.addEventListener("change", () => { cfg.proxyUrl = cfgProxyUrl.value.trim().replace(/\/$/, ""); saveConfig(); });
-  cfgIhaqToken.addEventListener("change", () => { cfg.ihaqToken = cfgIhaqToken.value.trim(); saveConfig(); if(hasProgressUI) connectIhaq(); });
+  cfgIhaqToken.addEventListener("change", () => {
+    cfg.ihaqToken = cfgIhaqToken.value.trim();
+    saveConfig();
+    if(hasProgressUI) connectIhaq();
+    // edited from a page that doesn't own the connection (e.g. a settings dock) —
+    // the owner page has its own copy of cfg in memory and won't notice this
+    // change on its own, so nudge it to reload the token and reconnect
+    else writeKey(IHAQ_TOKEN_SYNC_KEY, String(Date.now()));
+  });
   cfgProgressTitle.addEventListener("input", () => { cfg.progressTitle = cfgProgressTitle.value || "ДО РУЛЕТКИ"; saveConfig(); applyTitles(); });
   cfgGoal.addEventListener("change", () => { cfg.goal = Math.max(1, Number(cfgGoal.value)||1000); saveConfig(); updateProgressUI(); });
   cfgCurrency.addEventListener("change", () => { cfg.currency = cfgCurrency.value || "₽"; saveConfig(); updateProgressUI(); });
@@ -1379,6 +1388,14 @@
   if(hasProgressUI){
     connectRealtime();
     connectIhaq();
+    // the token can also be entered on a page that doesn't own the connection
+    // (e.g. a settings dock) — that page can't call connectIhaq() itself, so it
+    // pings this instead; pick up the freshly saved token and reconnect with it
+    watchKey(IHAQ_TOKEN_SYNC_KEY, (val) => {
+      if(!val) return;
+      cfg.ihaqToken = loadConfig().ihaqToken;
+      connectIhaq();
+    });
   } else {
     // this page (e.g. a settings dock) never opens its own iHAQ connection, so
     // mirror whichever source does own it instead of sitting on the static default.
