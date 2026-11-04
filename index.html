@@ -405,6 +405,7 @@
   const SPIN_TRIGGER_KEY = "da_roulette_spin_trigger_v1";
   const SPIN_RESULT_KEY = "da_roulette_spin_result_v1";
   const HISTORY_SYNC_KEY = "da_roulette_history_sync_v1";
+  const IHAQ_STATUS_KEY = "da_roulette_ihaq_status_v1";
 
   const urlParams = new URLSearchParams(location.search);
   const viewMode = urlParams.get("view"); // null/other = full widget, "progress", "roulette"
@@ -1320,7 +1321,11 @@
   // ---------- iHAQ Donate realtime (Socket.IO) — второй, независимый источник
   // донатов параллельно с DonationAlerts; оба пополняют одну и ту же цель ----------
   let ihaqSocket = null;
-  function setIhaqStatus(text){ if(ihaqStatus) ihaqStatus.textContent = text; }
+  function renderIhaqStatus(text){ if(ihaqStatus) ihaqStatus.textContent = text; }
+  // also pings other open OBS sources (e.g. a settings dock, which never owns the
+  // connection itself — see the hasProgressUI guard below) so they can mirror the
+  // real status instead of being stuck on the page's static default forever
+  function setIhaqStatus(text){ renderIhaqStatus(text); writeKey(IHAQ_STATUS_KEY, text); }
   function connectIhaq(){
     if(ihaqSocket){ try{ ihaqSocket.disconnect(); }catch(e){} ihaqSocket = null; }
     const token = (cfg.ihaqToken||"").trim();
@@ -1371,7 +1376,17 @@
   if(isDockSettings) settingsPanel.classList.add("open");
   // only the widget that shows the collection card owns the realtime connection,
   // so a roulette-only widget never double-counts the same donation
-  if(hasProgressUI){ connectRealtime(); connectIhaq(); }
+  if(hasProgressUI){
+    connectRealtime();
+    connectIhaq();
+  } else {
+    // this page (e.g. a settings dock) never opens its own iHAQ connection, so
+    // mirror whichever source does own it instead of sitting on the static default.
+    // watchKey only fires on a FUTURE change, so read whatever's already there first.
+    const lastKnownIhaqStatus = localStorage.getItem(IHAQ_STATUS_KEY);
+    renderIhaqStatus(lastKnownIhaqStatus || (cfg.ihaqToken ? "ожидание статуса с основного виджета..." : "не подключено"));
+    watchKey(IHAQ_STATUS_KEY, (val) => { if(val) renderIhaqStatus(val); });
+  }
 })();
 </script>
 </body>
