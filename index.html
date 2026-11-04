@@ -930,10 +930,17 @@
     cfg.ihaqToken = cfgIhaqToken.value.trim();
     saveConfig();
     if(hasProgressUI) connectIhaq();
-    // edited from a page that doesn't own the connection (e.g. a settings dock) —
-    // the owner page has its own copy of cfg in memory and won't notice this
-    // change on its own, so nudge it to reload the token and reconnect
-    else writeKey(IHAQ_TOKEN_SYNC_KEY, String(Date.now()));
+    else {
+      // edited from a page that doesn't own the connection (e.g. a settings dock) —
+      // the owner page has its own copy of cfg in memory and won't notice this
+      // change on its own, so nudge it to reload the token and reconnect
+      writeKey(IHAQ_TOKEN_SYNC_KEY, String(Date.now()));
+      // without this, the status text here just sits frozen at whatever it
+      // showed on page load (often a stale "не подключено") until some owner
+      // page happens to broadcast a real status — which never happens if no
+      // owner page is currently open anywhere
+      renderIhaqStatus(cfg.ihaqToken ? "ожидание статуса с основного виджета..." : "не подключено");
+    }
   });
   cfgProgressTitle.addEventListener("input", () => { cfg.progressTitle = cfgProgressTitle.value || "ДО РУЛЕТКИ"; saveConfig(); applyTitles(); });
   cfgGoal.addEventListener("change", () => { cfg.goal = Math.max(1, Number(cfgGoal.value)||1000); saveConfig(); updateProgressUI(); });
