@@ -314,6 +314,7 @@
       <label>API токен iHAQ</label>
       <input type="text" id="cfgIhaqToken" placeholder="например e1f2d3c4-b5a6-4978-80ca-9b8a7c6d5e4f">
       <div id="ihaqStatus" class="muted">не подключено</div>
+      <div id="ihaqLastMsg" class="muted"></div>
 
       <h3>Цель сбора</h3>
       <label>Заголовок карточки сбора</label>
@@ -407,6 +408,7 @@
   const HISTORY_SYNC_KEY = "da_roulette_history_sync_v1";
   const IHAQ_STATUS_KEY = "da_roulette_ihaq_status_v1";
   const IHAQ_TOKEN_SYNC_KEY = "da_roulette_ihaq_token_sync_v1";
+  const IHAQ_LASTMSG_KEY = "da_roulette_ihaq_lastmsg_v1";
 
   const urlParams = new URLSearchParams(location.search);
   const viewMode = urlParams.get("view"); // null/other = full widget, "progress", "roulette"
@@ -508,6 +510,7 @@
   const authStatus = document.getElementById("authStatus");
   const cfgIhaqToken = document.getElementById("cfgIhaqToken");
   const ihaqStatus = document.getElementById("ihaqStatus");
+  const ihaqLastMsg = document.getElementById("ihaqLastMsg");
   const cfgProgressTitle = document.getElementById("cfgProgressTitle");
   const cfgGoal = document.getElementById("cfgGoal");
   const cfgCurrency = document.getElementById("cfgCurrency");
@@ -1342,6 +1345,10 @@
   // connection itself — see the hasProgressUI guard below) so they can mirror the
   // real status instead of being stuck on the page's static default forever
   function setIhaqStatus(text){ renderIhaqStatus(text); writeKey(IHAQ_STATUS_KEY, text); }
+  // shows exactly what the socket received, so a mismatch between iHAQ's real
+  // payload and what connectIhaq() expects is visible without opening devtools
+  function renderIhaqLastMsg(text){ if(ihaqLastMsg) ihaqLastMsg.textContent = text; }
+  function setIhaqLastMsg(text){ renderIhaqLastMsg(text); writeKey(IHAQ_LASTMSG_KEY, text); }
   function connectIhaq(){
     if(ihaqSocket){ try{ ihaqSocket.disconnect(); }catch(e){} ihaqSocket = null; }
     const token = (cfg.ihaqToken||"").trim();
@@ -1355,6 +1362,7 @@
     ihaqSocket.on("disconnect", () => setIhaqStatus("отключено, переподключаюсь..."));
     ihaqSocket.on("connect_error", (e) => setIhaqStatus("ошибка подключения: " + (e && e.message || e)));
     ihaqSocket.on("message", (data) => {
+      setIhaqLastMsg("получено: " + JSON.stringify(data).slice(0, 400));
       if(!data || data.type !== "donation") return;
       const m = data.message || {};
       const amount = Number(m.amount);
@@ -1410,6 +1418,9 @@
     const lastKnownIhaqStatus = localStorage.getItem(IHAQ_STATUS_KEY);
     renderIhaqStatus(lastKnownIhaqStatus || (cfg.ihaqToken ? "ожидание статуса с основного виджета..." : "не подключено"));
     watchKey(IHAQ_STATUS_KEY, (val) => { if(val) renderIhaqStatus(val); });
+    const lastKnownIhaqMsg = localStorage.getItem(IHAQ_LASTMSG_KEY);
+    if(lastKnownIhaqMsg) renderIhaqLastMsg(lastKnownIhaqMsg);
+    watchKey(IHAQ_LASTMSG_KEY, (val) => { if(val) renderIhaqLastMsg(val); });
   }
 })();
 </script>
