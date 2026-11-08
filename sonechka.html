@@ -338,9 +338,10 @@
   #statsBox .statsCol{ display:inline-block; vertical-align:top; width:48%; }
   #statsBox ol{ margin:4px 0; padding-left:18px; }
 
-  /* Overlay full art on the empty art; only the fill boundary moves. */
+  /* Both layers use the same silhouette; the empty PNG has a different outline. */
   .statArt{position:relative;display:block;width:46px;height:46px;}
   .statArt .petStatIcon{position:absolute;inset:0;}
+  .statArt > .petStatIcon:first-child{filter:grayscale(1) brightness(.72) drop-shadow(0 1px 3px #0008);}
   .statArtFill{pointer-events:none;clip-path:inset(calc(100% - var(--stat-fill,0%)) 0 0);transition:clip-path .7s ease;}
   #petBubble,#hintBubble{width:360px;height:240px;aspect-ratio:auto;padding:0;z-index:5;}
   .bubbleCopy{position:absolute;inset:30% 16% 30% 20%;display:flex;align-items:center;justify-content:center;overflow-wrap:anywhere;white-space:pre-line;color:#612440;font-size:21px;font-weight:700;line-height:1.25;text-wrap:balance;}
@@ -353,6 +354,50 @@
   @keyframes petPulse{0%,100%{transform:scale(1)}45%{transform:scale(1.12);filter:drop-shadow(0 0 5px #e99abd)}}
   @keyframes milkWave{from{transform:translateY(0);opacity:.8}to{transform:translateY(-210px);opacity:0}}
   @media(prefers-reduced-motion:reduce){.petStatItem.actionFeed,.petStatItem.actionPet,#milkTube.actionMilk::after{animation:none}.statArtFill,#petSpriteImg{transition:none}}
+
+
+  /* Character depth: blurred peripheral scene, sharp central portrait. */
+  #petSceneBack{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center top;transform-origin:50% 0%;filter:blur(5px) brightness(.78);transition:transform 1.2s ease;pointer-events:none;}
+  #petSpriteImg{position:relative;mask-image:radial-gradient(ellipse 72% 100% at 50% 42%,#000 44%,#000d 70%,transparent 100%);}
+  #petAmbient{position:absolute;inset:0;pointer-events:none;background:radial-gradient(ellipse at 50% 15%,var(--mood-glow,#efafca) 0%,transparent 68%);mask-image:radial-gradient(ellipse at 50% 42%,transparent 35%,#000 95%);opacity:.12;transition:background 1s ease,opacity .6s ease;mix-blend-mode:screen;}
+  #petCard{--mood-glow:#efafca;}
+  #petCard[data-mood="sad"]{--mood-glow:#91a9cf;}
+  #petCard[data-mood="sad"] #petAmbient{opacity:.22;}
+  #petCard[data-mood="happy"] #petCardInner{box-shadow:0 7px 23px #140e224d,0 0 12px #efafca33;}
+  #petCard[data-hungry="true"] #petFullBar .statArt{opacity:.65;}
+  #petCard .petHeartDeco{transition:opacity .4s ease;}
+  #petCard[data-mood="sad"] .petHeartDeco{opacity:0;}
+  #petCard .petHeaderHeart{color:#f5bad2;}
+  #petCard.isQuiet #petSpriteWrap,#petCard.isQuiet .petHeartDeco,#petCard.isQuiet .critical{animation:none;}
+  #petCard.isQuiet .petHeartDeco{opacity:0;}
+  #petCard.isQuiet #petCardInner{box-shadow:0 5px 18px #140e223d;}
+  #petCard.isQuiet #petAmbient{opacity:.06;}
+  #petCard.isActive #petCardInner{box-shadow:0 7px 23px #140e224d,0 0 17px #efafca70;}
+  #milkReadyNote{position:absolute;right:5px;bottom:63px;width:max-content;max-width:170px;padding:5px 9px;border:1px solid #d2edff;border-radius:10px;background:#142c40;color:#effaff;font-size:12px;font-weight:700;opacity:0;transform:translateY(5px);transition:opacity .2s ease,transform .2s ease;pointer-events:none;z-index:4;}
+  #milkTubeWrap.bucketReady #milkReadyNote{opacity:1;transform:translateY(0);}
+  #milkTubeWrap.bucketReady #milkBucketIcon{animation:bucketRock .7s ease-in-out;filter:drop-shadow(0 0 7px #c1eeff);}
+  #milkTubeWrap.bucketReady #milkTube{box-shadow:inset 0 0 8px #d5f6ff,0 0 12px #b3e9ff;}
+  @keyframes bucketRock{0%,100%{transform:translateX(-50%) rotate(0)}25%{transform:translateX(-50%) rotate(-7deg)}65%{transform:translateX(-50%) rotate(6deg)}}
+  :is(#requestBanner,#catchBanner,#catchWinnersBanner).sonyaNotice{box-sizing:border-box;font-family:'Trebuchet MS','Segoe UI',sans-serif;background:linear-gradient(135deg,#352439fa,#1e2433fa);border:1px solid #f3c5d7;border-radius:16px;color:#fff2e7;box-shadow:0 8px 28px #090d1866;text-align:left;padding:14px 17px;overflow-wrap:anywhere;}
+  #requestBanner.sonyaNotice{width:310px;max-width:calc(100% - 24px);top:0;left:0;transform:translateY(8px);z-index:25;opacity:0;transition:opacity .25s ease,transform .25s ease;}
+  #requestBanner.sonyaNotice.show{opacity:1;transform:translateY(0);}
+  .noticeHeading{display:flex;align-items:center;gap:8px;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#e6b2cc;}
+  .noticeHeading img{width:25px;height:25px;object-fit:contain;}
+  .noticeCost{margin-left:auto;white-space:nowrap;letter-spacing:0;text-transform:none;color:#c0eaff;font-size:12px;}
+  .noticeTitle{font-size:16px;font-weight:700;line-height:1.3;margin-top:6px;color:#fff2e7;}
+  .noticeBody{font-size:17px;font-weight:600;line-height:1.4;margin-top:7px;color:#fff2e7;}
+  #requestBanner .noticeBody{max-height:min(45vh,240px);overflow:hidden;}
+  .noticeProgress{height:3px;position:absolute;bottom:0;left:16px;right:16px;overflow:hidden;border-radius:3px;background:#ffffff18;}
+  .noticeProgress::after{content:"";display:block;height:100%;background:#edb0cb;transform-origin:left;animation:noticeCountdown var(--notice-duration,10s) linear forwards;}
+  @keyframes noticeCountdown{to{transform:scaleX(0)}}
+  #catchBanner.sonyaNotice{top:26px;width:max-content;max-width:min(480px,calc(100% - 24px));z-index:22;}
+  #catchWinnersBanner.sonyaNotice{top:26px;width:max-content;max-width:min(560px,calc(100% - 24px));z-index:22;}
+  #catchBanner .noticeTitle{font-size:21px;color:#c0eaff;}
+  #catchWinnersBanner .noticeBody{font-size:16px;max-height:30vh;overflow:hidden;}
+  #burstWarning{font-family:'Trebuchet MS','Segoe UI',sans-serif;color:#fff2e7;text-shadow:0 2px 8px #1c1229,0 0 15px #d785a7;}
+  #moodPopupText{font-family:'Trebuchet MS','Segoe UI',sans-serif;color:#fff2e7;text-shadow:0 2px 8px #1c1229;}
+  #settingsPanel{z-index:100;}
+  @media(prefers-reduced-motion:reduce){#petSceneBack,#petAmbient{transition:none}#milkTubeWrap.bucketReady #milkBucketIcon,.noticeProgress::after{animation:none}.petHeartDeco,#petSpriteWrap{animation:none}}
 
 </style>
 </head>
@@ -376,9 +421,11 @@
   <div id="petCard">
     <div id="petCardInner">
       <div id="petSpriteWrap">
+        <img id="petSceneBack" alt="" aria-hidden="true">
         <img id="petSpriteImg" alt="Сонечка">
         <div id="petSpriteFallback">🐐</div>
       </div>
+      <div id="petAmbient" aria-hidden="true"></div>
       <div class="petHeartDeco" style="left:14%; top:14%;">💗</div>
       <div class="petHeartDeco" style="left:78%; top:22%; animation-delay:.6s;">💞</div>
       <div id="petStatsOverlay">
@@ -390,6 +437,7 @@
     <div id="petBubble"><span class="bubbleCopy"></span></div>
     <div id="hintBubble"><div class="bubbleCopy"><span id="hintMain"></span></div><div id="hintDetail"></div></div>
     <div id="milkTubeWrap">
+      <div id="milkReadyNote" aria-live="polite">Бидон готов!</div>
       <div id="milkTube"><div id="milkTubeFill"></div></div>
       <img id="milkBucketIcon" src="images/icons/moloko_100.png" alt="бутылка молока">
     </div>
@@ -588,6 +636,10 @@
       <button id="testChatNagBtn">Отправить нытьё в чат сейчас</button>
     </div>
 
+    <h3>Поведение на стриме</h3>
+    <label><input type="checkbox" id="cfgQuietMode"> Тихий режим между событиями</label>
+    <div class="muted">Через 12 секунд без событий декоративные анимации затихают. После доната Соня снова оживает.</div>
+
     <h3>Подсказка над головой</h3>
     <div class="muted">Время от времени всплывает над карточкой с советом, что писать в донат. Молчит, пока недавно были донаты — появляется только когда долго было тихо.</div>
     <div class="row">
@@ -663,6 +715,7 @@
       posX: 88,
       posY: 85,
       scale: 1, // масштаб всей карточки (крутится колёсиком мыши в режиме перетаскивания)
+      quietMode: true,
       halloweenMode: false, // временное — переключается кликом по миске корма
       adminSecret: "", // CATCH_SECRET для выдачи молока из панели — только в этом браузере
       litersPerFlood: 10, // один бидон = столько литров разбрызгивается
@@ -867,6 +920,7 @@
   const cfgChatMilkPhrases = document.getElementById("cfgChatMilkPhrases");
   const testChatNagBtn = document.getElementById("testChatNagBtn");
   const cfgHintIdleMinutes = document.getElementById("cfgHintIdleMinutes");
+  const cfgQuietMode = document.getElementById("cfgQuietMode");
   const cfgHintGapSeconds = document.getElementById("cfgHintGapSeconds");
   const cfgHintShowSeconds = document.getElementById("cfgHintShowSeconds");
   const testPopupBtn = document.getElementById("testPopupBtn");
@@ -977,6 +1031,7 @@
     cfgChatSadPhrases.value = cfg.chatSadPhrases;
     cfgChatMilkPhrases.value = cfg.chatMilkPhrases;
     cfgHintIdleMinutes.value = cfg.hintIdleMinutes;
+    cfgQuietMode.checked = cfg.quietMode !== false;
     cfgHintGapSeconds.value = cfg.hintGapSeconds;
     cfgHintShowSeconds.value = cfg.hintShowSeconds;
     renderAuthStatus();
@@ -1058,6 +1113,7 @@
     petCard.style.left = cfg.posX + "%";
     petCard.style.top = cfg.posY + "%";
     petCard.style.setProperty("--pet-scale", cfg.scale||1);
+    positionRequestCard();
   }
   cfgPosX.addEventListener("change", () => { cfg.posX = Math.max(0,Math.min(100,Number(cfgPosX.value)||0)); saveConfig(); applyPetPosition(); });
   cfgPosY.addEventListener("change", () => { cfg.posY = Math.max(0,Math.min(100,Number(cfgPosY.value)||0)); saveConfig(); applyPetPosition(); });
@@ -1076,6 +1132,7 @@
   function toggleArrangeMode(){
     arrangeMode = !arrangeMode;
     petCard.classList.toggle("arrangeMode", arrangeMode);
+    updateQuietMode();
     arrangeHint.style.display = arrangeMode ? "block" : "none";
     arrangeModeBtn.textContent = arrangeMode ? "Выключить перетаскивание" : "Включить перетаскивание";
   }
@@ -1173,6 +1230,7 @@
   cfgChatMilkPhrases.addEventListener("change", () => { cfg.chatMilkPhrases = cfgChatMilkPhrases.value; saveConfig(); });
   testChatNagBtn.addEventListener("click", () => { requestChatNag(buildChatNagText(pickMoodCategory() || "hungry")); });
   cfgHintIdleMinutes.addEventListener("change", () => { cfg.hintIdleMinutes = Number(cfgHintIdleMinutes.value)||0; saveConfig(); });
+  cfgQuietMode.addEventListener("change", () => {cfg.quietMode=cfgQuietMode.checked;saveConfig();updateQuietMode();});
   cfgHintGapSeconds.addEventListener("change", () => { cfg.hintGapSeconds = Number(cfgHintGapSeconds.value)||90; saveConfig(); scheduleNextHint(); });
   cfgHintShowSeconds.addEventListener("change", () => { cfg.hintShowSeconds = Number(cfgHintShowSeconds.value)||8; saveConfig(); });
   testPopupBtn.addEventListener("click", () => showMoodPopup());
@@ -1256,7 +1314,10 @@
     petSpriteImg.style.display = "block";
     const w = weightTier(), m = moodState();
     petSpriteImg.alt = `Сонечка: ${WEIGHT_LABELS[w]}, ${MOOD_LABELS[m]}`;
-    petSpriteImg.src = `images/sonechka-${w}-${m}.webp`;
+    const src = `images/sonechka-${w}-${m}.webp`;
+    if(petSpriteImg.getAttribute("src") !== src) petSpriteImg.src = src;
+    const back = document.getElementById("petSceneBack");
+    if(back.getAttribute("src") !== src) back.src = src;
   }
 
   const CRITICAL_STAT_THRESHOLD = 25; // ниже этого иконка рядом с полоской начинает пульсировать
@@ -1276,7 +1337,7 @@
       fill.className = "petStatIcon statArtFill";
       fill.src = `images/icons/${prefix}_100.png`; wrap.appendChild(fill);
     }
-    const empty = `images/icons/${prefix}_pusto.png`;
+    const empty = `images/icons/${prefix}_100.png`;
     if(imgEl.getAttribute("src") !== empty) imgEl.src = empty;
     wrap.style.setProperty("--stat-fill", Math.max(0,Math.min(100,pct)) + "%");
   }
@@ -1286,6 +1347,7 @@
     const wellbeing = happyPct; // Camera follows mood; fullness selects the body art.
     const zoom = SPRITE_ZOOM_MAX - (wellbeing/100) * (SPRITE_ZOOM_MAX - SPRITE_ZOOM_MIN);
     petSpriteImg.style.transform = `scale(${zoom.toFixed(3)})`;
+    document.getElementById("petSceneBack").style.transform = petSpriteImg.style.transform;
   }
   function updatePetUI(){
     updateSprite();
@@ -1293,6 +1355,8 @@
     const fullPct = Math.max(0,Math.min(100,cfg.fullness));
     const gaugePct = Math.max(0,Math.min(100,cfg.milkGauge||0));
     updateSpriteZoom(happyPct, fullPct);
+    petCard.dataset.mood = happyPct < 50 ? "sad" : "happy";
+    petCard.dataset.hungry = String(fullPct < 35);
     setStatIcon(happyLabel, "serdce", happyPct);
     setStatIcon(fullLabel, "korm", fullPct);
     milkTubeFill.style.height = gaugePct + "%";
@@ -1334,6 +1398,23 @@
     if(shift) el.style.marginLeft = `${shift}px`;
   }
 
+  let activityUntil = 0, activityTimer = null, bucketReadyTimer = null;
+  function updateQuietMode(){
+    const active = Date.now() < activityUntil;
+    petCard.classList.toggle("isActive",active);
+    petCard.classList.toggle("isQuiet",cfg.quietMode !== false && !active && !arrangeMode);
+  }
+  function wakeSonya(ms=12000){
+    activityUntil = Math.max(activityUntil,Date.now()+ms);
+    clearTimeout(activityTimer); updateQuietMode();
+    activityTimer = setTimeout(updateQuietMode,Math.max(0,activityUntil-Date.now())+20);
+  }
+  function celebrateBucket(){
+    wakeSonya(); clearTimeout(bucketReadyTimer);
+    milkTubeWrap.classList.remove("bucketReady");void milkTubeWrap.offsetWidth;
+    milkTubeWrap.classList.add("bucketReady");
+    bucketReadyTimer=setTimeout(()=>milkTubeWrap.classList.remove("bucketReady"),3200);
+  }
   let speechTimers = [];
   function stopSpeech(){
     speechTimers.forEach(clearTimeout); speechTimers = [];
@@ -1350,6 +1431,7 @@
   }
   function playSpeech(el, pages, duration){
     stopSpeech();
+    wakeSonya(Math.max(12000,duration+1000));
     const copy = el === hintBubble ? hintMain : el.querySelector(".bubbleCopy");
     const pageMs = Math.max(2600, duration / Math.max(1,pages.length));
     pages.forEach((page,i) => {
@@ -1363,12 +1445,39 @@
     playSpeech(petBubble, speechPages(text), 5200);
   }
   function reactToAction(effect){
+    wakeSonya();
     const target = effect === "feed" ? petFullBar : effect === "pet" ? petHappyBar : document.getElementById("milkTube");
     const name = effect === "feed" ? "actionFeed" : effect === "pet" ? "actionPet" : "actionMilk";
     target.classList.remove(name); void target.offsetWidth; target.classList.add(name);
     setTimeout(() => target.classList.remove(name),750);
   }
 
+  function fillNotice(el,heading,title,body,cost){
+    el.replaceChildren();el.classList.add("sonyaNotice");
+    const head=document.createElement("div");head.className="noticeHeading";
+    const icon=document.createElement("img");icon.src="images/icons/moloko_100.png";icon.alt="";
+    const label=document.createElement("span");label.textContent=heading;
+    head.append(icon,label);
+    if(cost !== undefined){const badge=document.createElement("span");badge.className="noticeCost";badge.textContent=`−${cost} л`;head.append(badge);}
+    const name=document.createElement("div");name.className="noticeTitle";name.textContent=title;
+    const text=document.createElement("div");text.className="noticeBody";text.textContent=body;
+    el.append(head,name,text);
+  }
+  function positionRequestCard(){
+    if(!requestBannerBusy)return;
+    const stage=document.getElementById("stage").getBoundingClientRect();
+    const card=petCard.getBoundingClientRect();
+    const width=requestBanner.offsetWidth,height=requestBanner.offsetHeight,gap=20;
+    let x=card.left-stage.left-width-gap;
+    if(x<12)x=card.right-stage.left+gap;
+    x=Math.max(12,Math.min(stage.width-width-12,x));
+    let y=card.bottom-stage.top-height;
+    // On a narrow source, put the request above the portrait if there is room.
+    if(x<card.right-stage.left && x+width>card.left-stage.left && card.top-stage.top>height+20)y=card.top-stage.top-height-gap;
+    requestBanner.style.left=x+"px";
+    requestBanner.style.top=Math.max(12,Math.min(stage.height-height-12,y))+"px";
+  }
+  window.addEventListener("resize",positionRequestCard);
   // ---------- просьбы за молочко ("!просьба <текст>", бот списывает литры и кладёт в очередь) ----------
   let requestQueue = [];
   let requestBannerBusy = false;
@@ -1377,7 +1486,11 @@
     const req = requestQueue.shift();
     if(!req) return;
     requestBannerBusy = true;
-    requestBanner.textContent = `📣 ${req.user} просит: ${req.text}`;
+    stopSpeech();wakeSonya(Math.max(12000,Number(cfg.requestHoldSeconds||10)*1000));
+    fillNotice(requestBanner,"Просьба зрителя",String(req.user||"Зритель"),String(req.text||""),req.cost ?? cfg.requestCost ?? 1);
+    const progress=document.createElement("div");progress.className="noticeProgress";
+    requestBanner.style.setProperty("--notice-duration",Math.max(3,Number(cfg.requestHoldSeconds||10))+"s");
+    requestBanner.append(progress);positionRequestCard();
     requestBanner.classList.add("show");
     playFile("sounds/bleat.mp3");
     setTimeout(() => {
@@ -1608,6 +1721,7 @@
         gainedCans++;
       }
       if(gainedCans > 0){
+        celebrateBucket();
         showBubble(`${donorName} подоил(а) Сонечку! 🥛 бидон наполнен! ${cfg.milkCans}/${cfg.floodThreshold}`);
       } else {
         showBubble(`${donorName} подоил(а) Сонечку! 🥛 шкала: ${Math.round(cfg.milkGauge)}%`);
@@ -1705,8 +1819,7 @@
   function startCatchRound(liters){
     const windowSeconds = cfg.catchWindowSeconds||10;
     showBubble(`🥛 Сонечка брызгает молоком! Лови командой ${cfg.catchCommand}`);
-    catchCmdLabel.textContent = cfg.catchCommand;
-    catchBanner.textContent = `🥛 Лови команду ${cfg.catchCommand}! Литров: ${liters}`;
+    fillNotice(catchBanner,"Соня разливает молоко",cfg.catchCommand,`${liters} л · лови в чате, пока молоко не закончилось`);
     catchBanner.classList.add("show");
     startCatchRoundOnServer(liters, windowSeconds + 5); // +5с запас на задержку бота
     setTimeout(async () => {
@@ -1718,7 +1831,7 @@
         catches.forEach(name => counts.set(name, (counts.get(name)||0) + 1));
         const summary = Array.from(counts.entries()).map(([name, n]) => `${name} — ${n} л`).join(", ");
         playFile("sounds/bleat.mp3");
-        catchWinnersBanner.textContent = "🐐 Поймали молоко: " + summary;
+        fillNotice(catchWinnersBanner,"Молоко поймано",`${catches.length} л забрали зрители`,summary);
         catchWinnersBanner.classList.add("show");
         setTimeout(() => catchWinnersBanner.classList.remove("show"), 6000);
       } else {
@@ -1838,7 +1951,7 @@
     hintTimer = setTimeout(() => { rotateHint(); hintTimer = setTimeout(scheduleNextHint, Math.max(10, Number(cfg.hintShowSeconds||8))*1000); }, Math.max(5, Number(cfg.hintGapSeconds||90))*1000);
   }
   function rotateHint(){
-    if(petBubble.classList.contains("show")) return; // не перебиваем активное сообщение
+    if(requestBannerBusy || petBubble.classList.contains("show")) return; // не перебиваем активное сообщение
     const idleMs = Date.now() - (cfg.lastInteractionAt||0);
     if(idleMs < Number(cfg.hintIdleMinutes||3)*60000) return; // недавно донатили — подсказка пока не нужна
     const hints = buildHints();
@@ -1961,6 +2074,7 @@
   // ---------- init ----------
   applyPetPosition();
   applyHalloweenMode();
+  updateQuietMode();
   updatePetUI();
   applyDecayIfDue();
   renderSettingsForm();
