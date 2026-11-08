@@ -10,7 +10,9 @@
     --panel-bg: rgba(15,15,20,0.92);
     --card-navy-dark: #121a2c;
     --card-navy-light: #1b2740;
-    --card-border: #37486c;
+    --card-border: #f3c5d7;
+    --sonya-cream: #fff2e7;
+    --sonya-rose: #d987aa;
   }
   html,body{
     margin:0; padding:0; background:transparent; overflow:hidden;
@@ -49,7 +51,7 @@
     position:absolute; inset:0; overflow:hidden; border-radius:18px;
     background:var(--card-navy-dark); border:1px solid var(--card-border);
     box-shadow:0 8px 26px rgba(0,0,0,.55);
-    animation: petGlow 3.4s ease-in-out infinite;
+    box-shadow:0 8px 24px #140e224d, 0 0 0 1px #fff2e733;
   }
   /* непрерывное мягкое "дыхание" подсветки по краю — чтобы карточка не
      выглядела статичной заставкой, а постоянно чуть "жила". Намеренно только
@@ -74,7 +76,7 @@
      cover даёт нулевой запас по вертикали на этих почти квадратных картинках
      (660x864), поэтому зумим чуть сильнее самого cover и прижимаем к верху,
      остальное обрезается overflow:hidden у #petCard */
-  #petSpriteImg{ width:100%; height:100%; object-fit:cover; object-position:center top; transform-origin:50% 0%; transition:transform .6s ease; display:none; }
+  #petSpriteImg{ width:100%; height:100%; object-fit:cover; object-position:center top; transform-origin:50% 0%; transition:transform 1.2s cubic-bezier(.22,.61,.36,1); display:none; }
   #petSpriteFallback{ font-size:56px; line-height:1; }
 
   /* decorative floating hearts, purely visual */
@@ -90,8 +92,8 @@
     position:absolute; left:50%; top:-14px; transform:translateX(-50%); z-index:3; cursor:pointer;
     display:flex; align-items:center; gap:6px;
     font-weight:800; font-size:12px; letter-spacing:.05em; text-transform:uppercase; color:#fff;
-    background:rgba(20,10,30,.88); border:1.5px solid #ff6fb5; border-radius:14px; padding:4px 14px;
-    box-shadow:0 0 14px rgba(255,111,181,.55);
+    background:#382438; border:1.5px solid var(--card-border); border-radius:14px; padding:4px 14px;
+    box-shadow:0 3px 10px #180f2455;
     white-space:nowrap;
   }
   .petHeaderHeart{ font-size:11px; }
@@ -106,7 +108,7 @@
   #milkTube{
     position:absolute; left:50%; top:0; transform:translateX(-50%);
     width:20px; height:212px; border-radius:10px;
-    background:rgba(15,35,55,.92); border:3px solid #cdeeff;
+    background:rgba(15,35,55,.92); border:3px solid var(--sonya-cream);
     box-shadow:inset 0 0 6px rgba(255,255,255,.3), 0 0 10px rgba(120,200,255,.5);
     overflow:hidden; display:flex; flex-direction:column; justify-content:flex-end;
   }
@@ -140,7 +142,7 @@
      и т.д.), ничего по отдельности не перекрашиваем — легко убрать потом,
      просто удалив этот блок и переключалку */
   #stage.halloweenMode{ filter: hue-rotate(55deg) saturate(1.35) brightness(.97) contrast(1.05); }
-  .petStatPct{ font-size:13px; font-weight:800; color:#fff; text-shadow:0 1px 3px rgba(0,0,0,.6); }
+  .petStatPct{ font-variant-numeric:tabular-nums; font-size:15px; font-weight:800; color:#fff; text-shadow:0 1px 3px rgba(0,0,0,.6); }
 
   /* когда показатель критически низкий — пульсирует иконка, чтобы было
      заметно даже краем глаза (как иконка здоровья в играх) */
@@ -335,6 +337,23 @@
   #statsBox{ margin-top:6px; font-size:12px; }
   #statsBox .statsCol{ display:inline-block; vertical-align:top; width:48%; }
   #statsBox ol{ margin:4px 0; padding-left:18px; }
+
+  /* Overlay full art on the empty art; only the fill boundary moves. */
+  .statArt{position:relative;display:block;width:46px;height:46px;}
+  .statArt .petStatIcon{position:absolute;inset:0;}
+  .statArtFill{pointer-events:none;clip-path:inset(calc(100% - var(--stat-fill,0%)) 0 0);transition:clip-path .7s ease;}
+  #petBubble,#hintBubble{width:360px;height:240px;aspect-ratio:auto;padding:0;z-index:5;}
+  .bubbleCopy{position:absolute;inset:30% 16% 30% 20%;display:flex;align-items:center;justify-content:center;overflow-wrap:anywhere;white-space:pre-line;color:#612440;font-size:21px;font-weight:700;line-height:1.25;text-wrap:balance;}
+  #hintMain{font:inherit;color:inherit;}
+  #hintDetail{display:none;}
+  .petStatItem.actionFeed{animation:feedBounce .55s ease;}
+  .petStatItem.actionPet{animation:petPulse .65s ease;}
+  #milkTube.actionMilk::after{content:"";position:absolute;left:0;right:0;bottom:0;height:8px;background:#fff7;animation:milkWave .7s ease-out forwards;pointer-events:none;}
+  @keyframes feedBounce{0%,100%{transform:translateY(0)}40%{transform:translateY(-5px)}70%{transform:translateY(1px)}}
+  @keyframes petPulse{0%,100%{transform:scale(1)}45%{transform:scale(1.12);filter:drop-shadow(0 0 5px #e99abd)}}
+  @keyframes milkWave{from{transform:translateY(0);opacity:.8}to{transform:translateY(-210px);opacity:0}}
+  @media(prefers-reduced-motion:reduce){.petStatItem.actionFeed,.petStatItem.actionPet,#milkTube.actionMilk::after{animation:none}.statArtFill,#petSpriteImg{transition:none}}
+
 </style>
 </head>
 <body>
@@ -368,8 +387,8 @@
       </div>
     </div>
     <div id="petNameHeader"><span class="petHeaderHeart">💗</span>Сонечка<span class="petHeaderHeart">💗</span></div>
-    <div id="petBubble"></div>
-    <div id="hintBubble"><div id="hintMain"></div><div id="hintDetail"></div></div>
+    <div id="petBubble"><span class="bubbleCopy"></span></div>
+    <div id="hintBubble"><div class="bubbleCopy"><span id="hintMain"></span></div><div id="hintDetail"></div></div>
     <div id="milkTubeWrap">
       <div id="milkTube"><div id="milkTubeFill"></div></div>
       <img id="milkBucketIcon" src="images/icons/moloko_100.png" alt="бутылка молока">
@@ -1248,13 +1267,23 @@
     return tier === 0 ? "pusto" : String(tier);
   }
   function setStatIcon(imgEl, prefix, pct){
-    imgEl.src = `images/icons/${prefix}_${iconTier(pct)}.png`;
+    let wrap = imgEl.closest(".statArt");
+    if(!wrap){
+      wrap = document.createElement("span"); wrap.className = "statArt";
+      imgEl.before(wrap); wrap.appendChild(imgEl);
+      const fill = imgEl.cloneNode(false); fill.removeAttribute("id");
+      fill.alt = ""; fill.setAttribute("aria-hidden", "true");
+      fill.className = "petStatIcon statArtFill";
+      fill.src = `images/icons/${prefix}_100.png`; wrap.appendChild(fill);
+    }
+    const empty = `images/icons/${prefix}_pusto.png`;
+    if(imgEl.getAttribute("src") !== empty) imgEl.src = empty;
+    wrap.style.setProperty("--stat-fill", Math.max(0,Math.min(100,pct)) + "%");
   }
-  // грустная/голодная — лицо крупным планом; чем счастливее и сытее, тем
-  // больше её видно, максимум — нынешний кроп (чуть ниже половины)
+  // Mood controls the camera; fullness still selects the character's body art.
   const SPRITE_ZOOM_MAX = 2.2, SPRITE_ZOOM_MIN = 1.2;
   function updateSpriteZoom(happyPct, fullPct){
-    const wellbeing = (happyPct + fullPct) / 2; // 0..100
+    const wellbeing = happyPct; // Camera follows mood; fullness selects the body art.
     const zoom = SPRITE_ZOOM_MAX - (wellbeing/100) * (SPRITE_ZOOM_MAX - SPRITE_ZOOM_MIN);
     petSpriteImg.style.transform = `scale(${zoom.toFixed(3)})`;
   }
@@ -1305,13 +1334,39 @@
     if(shift) el.style.marginLeft = `${shift}px`;
   }
 
+  let speechTimers = [];
+  function stopSpeech(){
+    speechTimers.forEach(clearTimeout); speechTimers = [];
+    petBubble.classList.remove("show"); hintBubble.classList.remove("show");
+  }
+  function speechPages(text){
+    const words = String(text).trim().split(/\s+/); const pages=[]; let line="";
+    for(const word of words){
+      if(line && (line+" "+word).length > 46){pages.push(line);line="";}
+      line += (line ? " " : "") + word;
+    }
+    if(line) pages.push(line);
+    return pages;
+  }
+  function playSpeech(el, pages, duration){
+    stopSpeech();
+    const copy = el === hintBubble ? hintMain : el.querySelector(".bubbleCopy");
+    const pageMs = Math.max(2600, duration / Math.max(1,pages.length));
+    pages.forEach((page,i) => {
+      const show = () => {copy.textContent=page;el.classList.add("show");clampBubbleToStage(el);};
+      if(i===0) show(); else speechTimers.push(setTimeout(show,i*pageMs));
+    });
+    speechTimers.push(setTimeout(() => el.classList.remove("show"), pages.length*pageMs));
+  }
   function showBubble(text){
-    hintBubble.classList.remove("show"); // не перекрываем реальное сообщение подсказкой
-    petBubble.textContent = text;
-    petBubble.classList.add("show");
-    clampBubbleToStage(petBubble);
     clearTimeout(bubbleTimer);
-    bubbleTimer = setTimeout(() => petBubble.classList.remove("show"), 4500);
+    playSpeech(petBubble, speechPages(text), 5200);
+  }
+  function reactToAction(effect){
+    const target = effect === "feed" ? petFullBar : effect === "pet" ? petHappyBar : document.getElementById("milkTube");
+    const name = effect === "feed" ? "actionFeed" : effect === "pet" ? "actionPet" : "actionMilk";
+    target.classList.remove(name); void target.offsetWidth; target.classList.add(name);
+    setTimeout(() => target.classList.remove(name),750);
   }
 
   // ---------- просьбы за молочко ("!просьба <текст>", бот списывает литры и кладёт в очередь) ----------
@@ -1506,6 +1561,7 @@
   }
 
   function applyPetAction(action, amount, donorName){
+    reactToAction(action.effect);
     cfg.lastInteractionAt = Date.now();
     const strength = donationStrength01(amount);
     if(action.effect === "feed"){
@@ -1514,7 +1570,7 @@
       cfg.fullness = Math.min(100, cfg.fullness + gain);
       cfg.growth = cfg.growth + Number(cfg.feedGrowthStep||0.2)*strength;
       applyOverflowSlowdown(overflow, "fullnessSlowUntil");
-      popupNear(petFullBar, "+" + Math.round(gain));
+      popupNear(petFullBar, "+" + Math.round(gain) + "%");
       showBubble(`${donorName}: ${pickPhrase(cfg.feedPhrases, "Ой как вкусно!")} 🌾`);
       playFile("sounds/feed.mp3");
     } else if(action.effect === "pet"){
@@ -1522,7 +1578,7 @@
       const overflow = Math.max(0, cfg.happiness + gain - 100);
       cfg.happiness = Math.min(100, cfg.happiness + gain);
       applyOverflowSlowdown(overflow, "happinessSlowUntil");
-      popupNear(petHappyBar, "+" + Math.round(gain));
+      popupNear(petHappyBar, "+" + Math.round(gain) + "%");
       showBubble(`${donorName}: ${pickPhrase(cfg.petPhrases, "Хи-хи-хи!")} 💛`);
       playFile("sounds/pet.mp3");
     } else if(action.effect === "milk"){
@@ -1759,7 +1815,7 @@
   }
 
   // ---------- idle hint bubble — cycles tips for each action + the catch command ----------
-  // каждая подсказка — {main: крупный вопрос, detail: мелкая приписка про донат}
+  // Each hint has two parts, displayed as consecutive large-text pages.
   function buildHints(){
     const hints = (cfg.actions||[]).filter(a => a.enabled !== false).map(a => {
       const kw = parseKeywords(a.keywords)[0];
@@ -1779,7 +1835,7 @@
   // раньше чем через hintGapSeconds ПОСЛЕ этого (а не почти без пауз, как было)
   function scheduleNextHint(){
     clearTimeout(hintTimer);
-    hintTimer = setTimeout(() => { rotateHint(); scheduleNextHint(); }, Math.max(5, Number(cfg.hintGapSeconds||90))*1000);
+    hintTimer = setTimeout(() => { rotateHint(); hintTimer = setTimeout(scheduleNextHint, Math.max(10, Number(cfg.hintShowSeconds||8))*1000); }, Math.max(5, Number(cfg.hintGapSeconds||90))*1000);
   }
   function rotateHint(){
     if(petBubble.classList.contains("show")) return; // не перебиваем активное сообщение
@@ -1788,11 +1844,8 @@
     const hints = buildHints();
     if(!hints.length) return;
     hintIdx = (hintIdx + 1) % hints.length;
-    hintMain.textContent = hints[hintIdx].main;
-    hintDetail.textContent = hints[hintIdx].detail;
-    hintBubble.classList.add("show");
-    clampBubbleToStage(hintBubble);
-    setTimeout(() => hintBubble.classList.remove("show"), Math.max(2, Number(cfg.hintShowSeconds||8))*1000);
+    const pages = [...speechPages(hints[hintIdx].main), ...speechPages(hints[hintIdx].detail)];
+    playSpeech(hintBubble, pages, Math.max(6, Number(cfg.hintShowSeconds||8))*1000);
   }
 
   // ---------- test tools ----------
