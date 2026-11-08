@@ -391,14 +391,17 @@
   #milkTubeWrap.bucketReady #milkTube{box-shadow:inset 0 0 8px #d5f6ff,0 0 12px #b3e9ff;}
   @keyframes bucketRock{0%,100%{transform:translateX(-50%) rotate(0)}25%{transform:translateX(-50%) rotate(-7deg)}65%{transform:translateX(-50%) rotate(6deg)}}
   :is(#requestBanner,#catchBanner,#catchWinnersBanner).sonyaNotice{box-sizing:border-box;font-family:'Trebuchet MS','Segoe UI',sans-serif;background:linear-gradient(135deg,#352439fa,#1e2433fa);border:1px solid #f3c5d7;border-radius:16px;color:#fff2e7;box-shadow:0 8px 28px #090d1866;text-align:left;padding:14px 17px;overflow-wrap:anywhere;}
-  #requestBanner.sonyaNotice{width:310px;max-width:calc(100% - 24px);top:0;left:0;transform:translateY(8px);z-index:25;opacity:0;transition:opacity .25s ease,transform .25s ease;}
-  #requestBanner.sonyaNotice.show{opacity:1;transform:translateY(0);}
+  #requestBanner.sonyaNotice{width:350px;transform-origin:top left;max-width:calc(100% - 24px);top:0;left:0;transform:translateY(8px) scale(var(--notice-scale,1));z-index:25;opacity:0;transition:opacity .25s ease,transform .25s ease;}
+  #requestBanner.sonyaNotice.show{opacity:1;transform:translateY(0) scale(var(--notice-scale,1));}
   .noticeHeading{display:flex;align-items:center;gap:8px;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#e6b2cc;}
   .noticeHeading img{width:25px;height:25px;object-fit:contain;}
   .noticeCost{margin-left:auto;white-space:nowrap;letter-spacing:0;text-transform:none;color:#c0eaff;font-size:12px;}
   .noticeTitle{font-size:16px;font-weight:700;line-height:1.3;margin-top:6px;color:#fff2e7;}
   .noticeBody{font-size:17px;font-weight:600;line-height:1.4;margin-top:7px;color:#fff2e7;}
-  #requestBanner .noticeBody{max-height:min(45vh,240px);overflow:hidden;}
+  #requestBanner .noticeTitle{font-size:18px;}
+  #requestBanner .noticeHeading{font-size:12px;}
+  #requestBanner .noticeCost{font-size:13px;}
+  #requestBanner .noticeBody{font-size:19px;line-height:1.4;max-height:none;overflow:visible;}
   .noticeProgress{height:3px;position:absolute;bottom:0;left:16px;right:16px;overflow:hidden;border-radius:3px;background:#ffffff18;}
   .noticeProgress::after{content:"";display:block;height:100%;background:#edb0cb;transform-origin:left;animation:noticeCountdown var(--notice-duration,10s) linear forwards;}
   @keyframes noticeCountdown{to{transform:scaleX(0)}}
@@ -1564,16 +1567,30 @@
   function positionRequestCard(){
     if(!requestBannerBusy)return;
     const stage=document.getElementById("stage").getBoundingClientRect();
-    const card=petCard.getBoundingClientRect();
-    const width=requestBanner.offsetWidth,height=requestBanner.offsetHeight,gap=20;
-    let x=card.left-stage.left-width-gap;
-    if(x<12)x=card.right-stage.left+gap;
-    x=Math.max(12,Math.min(stage.width-width-12,x));
-    let y=card.bottom-stage.top-height;
-    // On a narrow source, put the request above the portrait if there is room.
-    if(x<card.right-stage.left && x+width>card.left-stage.left && card.top-stage.top>height+20)y=card.top-stage.top-height-gap;
-    requestBanner.style.left=x+"px";
-    requestBanner.style.top=Math.max(12,Math.min(stage.height-height-12,y))+"px";
+    // Reserve the whole assembly, including artwork outside the card itself.
+    const parts=[petCard,document.getElementById("petNameHeader"),document.getElementById("milkTube"),document.getElementById("milkBucketIcon")].map(el=>el.getBoundingClientRect());
+    const left=Math.min(...parts.map(r=>r.left))-stage.left;
+    const right=Math.max(...parts.map(r=>r.right))-stage.left;
+    const top=Math.min(...parts.map(r=>r.top))-stage.top;
+    const bottom=Math.max(...parts.map(r=>r.bottom))-stage.top;
+    const width=requestBanner.offsetWidth,height=requestBanner.offsetHeight,gap=24,edge=12;
+    const sw=stage.width,sh=stage.height;
+    const slots=[
+      {side:"left",x:edge,y:edge,w:left-gap-edge,h:sh-2*edge},
+      {side:"right",x:right+gap,y:edge,w:sw-right-gap-edge,h:sh-2*edge},
+      {side:"above",x:edge,y:edge,w:sw-2*edge,h:top-gap-edge},
+      {side:"below",x:edge,y:bottom+gap,w:sw-2*edge,h:sh-bottom-gap-edge}
+    ].filter(r=>r.w>0 && r.h>0);
+    slots.forEach(r=>{r.scale=Math.min(1,r.w/width,r.h/height);});
+    const slot=slots.find(r=>r.scale===1) || slots.sort((a,b)=>b.scale-a.scale)[0];
+    if(!slot)return;
+    const scale=slot.scale,w=width*scale,h=height*scale;
+    const clamp=(v,lo,hi)=>Math.max(lo,Math.min(hi,v));
+    const x=slot.side==="left" ? left-gap-w : slot.side==="right" ? slot.x : clamp((left+right-w)/2,slot.x,slot.x+slot.w-w);
+    const y=slot.side==="above" ? top-gap-h : slot.side==="below" ? slot.y : clamp(bottom-h,edge,sh-edge-h);
+    requestBanner.style.setProperty("--notice-scale",scale);
+    requestBanner.dataset.placement=slot.side;
+    requestBanner.style.left=x+"px";requestBanner.style.top=y+"px";
   }
   window.addEventListener("resize",positionRequestCard);
   window.addEventListener("resize", () => {
