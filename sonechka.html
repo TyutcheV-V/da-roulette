@@ -691,8 +691,8 @@
     <h3>Подсказка над головой</h3>
     <div class="muted">Время от времени всплывает над карточкой с советом, что писать в донат. Молчит, пока недавно были донаты — появляется только когда долго было тихо.</div>
     <div class="row">
-      <div><label>Молчать, пока не пройдёт без донатов, минут</label><input type="number" id="cfgHintIdleMinutes" value="3" min="0"></div>
-      <div><label>Пауза между подсказками, сек</label><input type="number" id="cfgHintGapSeconds" value="90" min="5"></div>
+      <div><label>Молчать, пока не пройдёт без донатов, минут</label><input type="number" id="cfgHintIdleMinutes" value="5" min="0"></div>
+      <div><label>Пауза между подсказками, сек</label><input type="number" id="cfgHintGapSeconds" value="300" min="5"></div>
     </div>
     <label>Сколько секунд держится на экране</label>
     <input type="number" id="cfgHintShowSeconds" value="8" min="2">
@@ -814,8 +814,8 @@
       chatHungryPhrases: "АЛЁ Я ГОЛОДНАЯ((((\nЛЮДИ, Я ГОЛОДНАЯ, ПОМОГИТЕ\nЖИВОТ СВОДИТ ОТ ГОЛОДА(",
       chatSadPhrases: "МНЕ ТАК ГРУСТНО(((\nПОГЛАДЬТЕ МЕНЯ, Я ОДИНОКАЯ\nНИКТО МЕНЯ НЕ ЛЮБИТ(((",
       chatMilkPhrases: "МОЛОКО РАСПИРАЕТ, ПОМОГИТЕ\nДАВНО МЕНЯ НЕ ДОИЛИ(((\nПОДОИТЕ МЕНЯ СРОЧНО",
-      hintIdleMinutes: 3,            // не показывать подсказку, пока не пройдёт столько минут без донатов
-      hintGapSeconds: 90,            // пауза между подсказками (раньше она висела почти постоянно)
+      hintIdleMinutes: 5,            // не показывать подсказку, пока не пройдёт столько минут без донатов
+      hintGapSeconds: 300,            // пауза между подсказками (раньше она висела почти постоянно)
       hintShowSeconds: 8,            // сколько секунд держится на экране один раз всплыв
       // runtime pet state, persisted alongside settings
       happiness: 70,
@@ -840,6 +840,14 @@
 
   let cfg = loadConfig();
   function saveConfig(){ localStorage.setItem(STORE_KEY, JSON.stringify(cfg)); }
+  // Apply calmer timings once to existing OBS profiles as well as fresh ones.
+  // Longer custom pauses are preserved; later manual changes remain editable.
+  if(cfg.hintTimingVersion !== 1){
+    cfg.hintGapSeconds = Math.max(300,Number(cfg.hintGapSeconds)||300);
+    cfg.hintIdleMinutes = Math.max(5,Number(cfg.hintIdleMinutes)||5);
+    cfg.hintTimingVersion = 1;
+    saveConfig();
+  }
 
   // ---------- shared DonationAlerts credentials (same key the roulette widget uses) ----------
   function loadDA(){
@@ -1284,7 +1292,7 @@
   cfgHintIdleMinutes.addEventListener("change", () => { cfg.hintIdleMinutes = Number(cfgHintIdleMinutes.value)||0; saveConfig(); });
   cfgEffectsLevel.addEventListener("change", () => {cfg.effectsLevel=Number(cfgEffectsLevel.value);saveConfig();applyEffectsLevel();});
   cfgQuietMode.addEventListener("change", () => {cfg.quietMode=cfgQuietMode.checked;saveConfig();updateQuietMode();});
-  cfgHintGapSeconds.addEventListener("change", () => { cfg.hintGapSeconds = Number(cfgHintGapSeconds.value)||90; saveConfig(); scheduleNextHint(); });
+  cfgHintGapSeconds.addEventListener("change", () => { cfg.hintGapSeconds = Number(cfgHintGapSeconds.value)||300; saveConfig(); scheduleNextHint(); });
   cfgHintShowSeconds.addEventListener("change", () => { cfg.hintShowSeconds = Number(cfgHintShowSeconds.value)||8; saveConfig(); });
   testPopupBtn.addEventListener("click", () => showMoodPopup());
 
@@ -2043,12 +2051,12 @@
   // раньше чем через hintGapSeconds ПОСЛЕ этого (а не почти без пауз, как было)
   function scheduleNextHint(){
     clearTimeout(hintTimer);
-    hintTimer = setTimeout(() => { rotateHint(); hintTimer = setTimeout(scheduleNextHint, Math.max(10, Number(cfg.hintShowSeconds||8))*1000); }, Math.max(5, Number(cfg.hintGapSeconds||90))*1000);
+    hintTimer = setTimeout(() => { rotateHint(); hintTimer = setTimeout(scheduleNextHint, Math.max(10, Number(cfg.hintShowSeconds||8))*1000); }, Math.max(5, Number(cfg.hintGapSeconds||300))*1000);
   }
   function rotateHint(){
     if(requestBannerBusy || petBubble.classList.contains("show")) return; // не перебиваем активное сообщение
     const idleMs = Date.now() - (cfg.lastInteractionAt||0);
-    if(idleMs < Number(cfg.hintIdleMinutes||3)*60000) return; // недавно донатили — подсказка пока не нужна
+    if(idleMs < Number(cfg.hintIdleMinutes||5)*60000) return; // недавно донатили — подсказка пока не нужна
     const hints = buildHints();
     if(!hints.length) return;
     hintIdx = (hintIdx + 1) % hints.length;
