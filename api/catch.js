@@ -13,6 +13,7 @@ const CATCH_SECRET = process.env.CATCH_SECRET;
 
 const ROUND_KEY = "sonechka:round:remaining";
 const CATCHES_KEY = "sonechka:round:catches";
+const ROUND_META_KEY = "sonechka:round:meta";
 const BALANCE_KEY = "sonechka:drinkers"; // reused: lifetime milk balance per Twitch login
 const REQUESTS_KEY = "sonechka:requests"; // queue of paid "!просьба" asks, drained by the widget
 const REQUESTS_LOG_KEY = "sonechka:requests:log"; // same asks, kept permanently for the dashboard (api/stats.js reads this)
@@ -70,12 +71,14 @@ module.exports = async function handler(req, res) {
         return;
       }
       if (action === "status") {
-        const [remainingRaw, catches] = await Promise.all([
+        const [remainingRaw, catches, metaRaw] = await Promise.all([
           redis("GET", ROUND_KEY),
           redis("LRANGE", CATCHES_KEY, 0, -1),
+          redis("GET", ROUND_META_KEY),
         ]);
         res.status(200).json({
-          catchProtocol: 2,
+          catchProtocol: 3,
+          round: metaRaw ? JSON.parse(metaRaw) : null,
           active: remainingRaw !== null,
           remaining: remainingRaw !== null ? Number(remainingRaw) : 0,
           catches: catches || [],
@@ -113,8 +116,10 @@ module.exports = async function handler(req, res) {
       if (action === "start") {
         const liters = Math.max(1, Math.round(Number(body.liters) || 10));
         const ttlSeconds = Math.max(5, Math.round(Number(body.ttlSeconds) || 30));
-        await redis("EVAL", "redis.call('DEL', KEYS[2]); redis.call('SET', KEYS[1], ARGV[1], 'EX', ARGV[2]); return 1", 2, ROUND_KEY, CATCHES_KEY, liters, ttlSeconds);
-        res.status(200).json({ ok: true, liters });
+        const startedAt = Date.now();
+        const round = { id: require("crypto").randomUUID(), liters, startedAt, endsAt: startedAt + ttlSeconds * 1000 };
+        await redis("EVAL", "redis.call('DEL', KEYS[2]); redis.call('SET', KEYS[1], ARGV[1], 'EX', ARGV[2]); redis.call('SET', KEYS[3], ARGV[3], 'EX', 300); return 1", 3, ROUND_KEY, CATCHES_KEY, ROUND_META_KEY, liters, ttlSeconds, JSON.stringify(round));
+        res.status(200).json({ ok: true, liters, round });
         return;
       }
 

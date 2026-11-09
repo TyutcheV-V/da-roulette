@@ -406,9 +406,11 @@
   .noticeProgress::after{content:"";display:block;height:100%;background:#edb0cb;transform-origin:left;animation:noticeCountdown var(--notice-duration,10s) linear forwards;}
   @keyframes noticeCountdown{to{transform:scaleX(0)}}
   #catchBanner.sonyaNotice{top:26px;width:max-content;max-width:min(480px,calc(100% - 24px));z-index:22;}
-  #catchWinnersBanner.sonyaNotice{top:26px;width:max-content;max-width:min(560px,calc(100% - 24px));z-index:22;}
+  #catchWinnersBanner.sonyaNotice{top:35%;width:800px;max-width:calc(100% - 48px);z-index:30;padding:26px 32px;text-align:center;}
   #catchBanner .noticeTitle{font-size:21px;color:#c0eaff;}
-  #catchWinnersBanner .noticeBody{font-size:16px;max-height:30vh;overflow:hidden;}
+  #catchWinnersBanner .noticeHeading{justify-content:center;font-size:16px;}
+  #catchWinnersBanner .noticeTitle{font-size:clamp(22px,3vw,38px);}
+  #catchWinnersBanner .noticeBody{font-size:clamp(20px,2.5vw,32px);max-height:none;overflow:visible;white-space:pre-line;}
   #burstWarning{font-family:'Trebuchet MS','Segoe UI',sans-serif;color:#fff2e7;text-shadow:0 2px 8px #1c1229,0 0 15px #d785a7;}
   #moodPopupText{font-family:'Trebuchet MS','Segoe UI',sans-serif;color:#fff2e7;text-shadow:0 2px 8px #1c1229;}
   #settingsPanel{z-index:100;}
@@ -732,6 +734,7 @@
       <button id="testDonateBtn">Тестовый донат</button>
       <button id="testFloodBtn">Проверить заливку</button>
     </div>
+    <div id="catchTestResult" class="muted" role="status"></div>
 
     <h3>Экспорт / импорт настроек</h3>
     <div class="muted">Чтобы перенести настройки Сонечки (включая Twitch-канал и действия) между браузером и OBS: «Экспорт» → скопировать → вставить в поле ниже внутри OBS (режим Interact) → «Импорт». Вход в DonationAlerts переносится отдельно вместе с виджетом рулетки.</div>
@@ -1664,7 +1667,9 @@
         body: JSON.stringify({ action:"start", liters, ttlSeconds }),
         signal: AbortSignal.timeout(12000)
       });
-      return r.ok && (await r.json()).ok === true;
+      if(!r.ok) return null;
+      const json = await r.json();
+      return json.ok === true ? json : null;
     }catch(e){ console.warn("catch start failed", e); return false; }
   }
   async function fetchCatchStatus(){
@@ -1913,6 +1918,10 @@
       popupNear(petHappyBar, "+" + happinessGain);
     }
     saveConfig();
+    updatePetUI();
+    startCatchRound(liters);
+  }
+  function playFloodVisual(){
     const holdMs = (cfg.floodHoldSeconds||6)*1000;
     floodText.textContent = cfg.floodText;
     floodOverlay.classList.add("show");
@@ -1928,16 +1937,11 @@
       dropLayer.innerHTML = "";
       try{ floodVideo.pause(); }catch(e){}
     }, holdMs);
-    updatePetUI();
-    // бидон = N литров молочка; раунд ловли ведёт бот в чате (засчитывает
-    // "!ловлю" каждому, кто напишет, пока литры не кончатся) — виджет только
-    // открывает раунд на сервере и потом показывает итог
-    startCatchRound(liters);
   }
 
   let catchRoundQueue = Promise.resolve();
+  const displayedCatchRounds = new Set();
   function startCatchRound(liters){
-    if(isDockSettings) return;
     catchRoundQueue = catchRoundQueue.then(() => runCatchRound(liters)).catch(e => {
       console.error("catch round failed", e);
       catchBanner.classList.remove("show");
@@ -1949,16 +1953,30 @@
     const windowSeconds = cfg.catchWindowSeconds||10;
     const opened = await startCatchRoundOnServer(liters, windowSeconds + 5);
     if(!opened){
+      document.getElementById("catchTestResult").textContent = "Ловля не открылась: проверь соединение и прокси-URL.";
       showBubble("Не удалось открыть ловлю молока. Нет связи с сервером.");
       return;
     }
+    if(isDockSettings){
+      document.getElementById("catchTestResult").textContent = "Ловля открыта на сервере. Напишите !ловлю в чате. Итоги появятся в основном источнике Сонечки.";
+      showBubble("Ловля открыта. Зрители могут писать !ловлю.");
+      await new Promise(resolve => setTimeout(resolve, Math.max(0, (opened.round?.endsAt || Date.now()+windowSeconds*1000)-Date.now()+1000)));
+      return;
+    }
+    await presentCatchRound(opened.round || {id:String(Date.now()), liters, endsAt:Date.now()+(windowSeconds+5)*1000});
+  }
+  async function presentCatchRound(round){
+    if(displayedCatchRounds.has(round.id)) return;
+    displayedCatchRounds.add(round.id);
+    playFloodVisual();
+    const liters = round.liters;
     showBubble(`🥛 Сонечка брызгает молоком! Лови командой ${cfg.catchCommand}`);
     fillNotice(catchBanner,"Лови молочко!",cfg.catchCommand,`${liters} л · лови в чате, пока молоко не закончилось`);
     catchBanner.classList.add("show");
-    await new Promise(resolve => setTimeout(resolve, windowSeconds*1000));
+    await new Promise(resolve => setTimeout(resolve, Math.max(0, round.endsAt-Date.now()-5000)));
       catchBanner.classList.remove("show");
       // Allow the bot's in-flight commands to finish before reading the list.
-      await new Promise(resolve => setTimeout(resolve, 5500));
+      await new Promise(resolve => setTimeout(resolve, Math.max(500, round.endsAt-Date.now()+500)));
       let status = null;
       for(let attempt=0; attempt<3 && !status; attempt++){
         status = await fetchCatchStatus();
@@ -1968,20 +1986,34 @@
         showBubble("Не удалось загрузить итоги ловли. Балансы можно проверить: !молочко");
         return;
       }
+      if(status.round && status.round.id !== round.id) return;
       const catches = (status && status.catches) || [];
       if(catches.length){
         const counts = new Map();
         catches.forEach(name => counts.set(name, (counts.get(name)||0) + 1));
-        const summary = Array.from(counts.entries()).map(([name, n]) => `${name} — ${n} л`).join(", ");
+        const summary = Array.from(counts.entries()).map(([name, n]) => `${name} — ${n} л`).join("\n");
         playFile("sounds/bleat.mp3");
         fillNotice(catchWinnersBanner,"Молоко поймано",`${catches.length} л забрали зрители`,summary);
         catchWinnersBanner.classList.add("show");
-        setTimeout(() => catchWinnersBanner.classList.remove("show"), 6000);
+        setTimeout(() => catchWinnersBanner.classList.remove("show"), 10000);
       } else {
         showBubble("Молоко никто не поймал, разлилось...");
       }
       fetchStats();
   }
+  let catchWatchBusy = false;
+  async function watchCatchRound(){
+    if(isDockSettings || catchWatchBusy) return;
+    catchWatchBusy = true;
+    try{
+      const status = await fetchCatchStatus();
+      if(status?.round && Date.now() < status.round.endsAt+15000 && !displayedCatchRounds.has(status.round.id)){
+        await presentCatchRound(status.round);
+      }
+    }catch(e){ console.warn("catch watch failed", e); }
+    finally{ catchWatchBusy = false; }
+  }
+  if(!isDockSettings) setInterval(watchCatchRound, 2000);
 
   // ---------- decay over time (neglect) ----------
   // плавное, постепенное падение — считаем прошедшее время и снимаем долю
@@ -2124,6 +2156,7 @@
     return `https://www.donationalerts.com/api/v1/${path}`;
   }
   async function connectRealtime(){
+    if(isDockSettings) return;
     da = loadDA();
     if(!da.accessToken) return;
     if(da.tokenExpiresAt && da.tokenExpiresAt < Date.now()) return;
@@ -2181,6 +2214,7 @@
   // ---------- iHAQ Donate realtime (additional donation source, same handlePetDonation) ----------
   let ihaqSocket = null;
   function connectIhaq(){
+    if(isDockSettings) return;
     da = loadDA();
     if(ihaqSocket){ try{ ihaqSocket.disconnect(); }catch(e){} ihaqSocket = null; }
     const token = (da.ihaqToken||"").trim();
