@@ -75,6 +75,7 @@ module.exports = async function handler(req, res) {
           redis("LRANGE", CATCHES_KEY, 0, -1),
         ]);
         res.status(200).json({
+          catchProtocol: 2,
           active: remainingRaw !== null,
           remaining: remainingRaw !== null ? Number(remainingRaw) : 0,
           catches: catches || [],
