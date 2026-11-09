@@ -222,8 +222,12 @@ setInterval(checkNag, 20 * 1000);
 // it — this endpoint is what an external uptime pinger (e.g. UptimeRobot)
 // hits every few minutes to keep the bot connected during streams.
 const http = require("http");
+const { handleApiBridge } = require("./api-bridge");
+const { serveWidget } = require("./widget-server");
 const PORT = process.env.PORT || 3000;
-http.createServer((req, res) => {
+http.createServer(async (req, res) => {
+  if (await handleApiBridge(req, res, CATCH_API_URL)) return;
+  if (serveWidget(req, res)) return;
   if (req.url === "/health") {
     const connected = client.readyState() === "OPEN";
     res.writeHead(connected ? 200 : 503, { "Content-Type": "application/json" });
@@ -232,4 +236,4 @@ http.createServer((req, res) => {
   }
   res.writeHead(200, { "Content-Type": "text/plain; charset=utf-8" });
   res.end("Сонечка-бот жива\n");
-}).listen(PORT, () => console.log(`health check server listening on :${PORT}`));
+}).listen(PORT, process.env.RENDER ? "0.0.0.0" : "127.0.0.1", () => console.log(`health check server listening on :${PORT}`));

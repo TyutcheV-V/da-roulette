@@ -865,11 +865,11 @@
         accessToken: parsed.accessToken || "",
         tokenExpiresAt: parsed.tokenExpiresAt || 0,
         userId: parsed.userId || null,
-        proxyUrl: parsed.proxyUrl || "",
+        proxyUrl: /^(localhost|127\.0\.0\.1)$/.test(location.hostname) ? location.origin : (parsed.proxyUrl || "https://da-roulette.vercel.app"),
         ihaqToken: parsed.ihaqToken || ""
       };
     }catch(e){
-      return { clientId:"", accessToken:"", tokenExpiresAt:0, userId:null, proxyUrl:"", ihaqToken:"" };
+      return { clientId:"", accessToken:"", tokenExpiresAt:0, userId:null, proxyUrl:/^(localhost|127\.0\.0\.1)$/.test(location.hostname) ? location.origin : "https://da-roulette.vercel.app", ihaqToken:"" };
     }
   }
   function saveDA(patch){
@@ -2013,7 +2013,7 @@
     }catch(e){ console.warn("catch watch failed", e); }
     finally{ catchWatchBusy = false; }
   }
-  if(!isDockSettings) setInterval(watchCatchRound, 2000);
+  if(!isDockSettings) setInterval(watchCatchRound, 5000);
 
   // ---------- decay over time (neglect) ----------
   // плавное, постепенное падение — считаем прошедшее время и снимаем долю
