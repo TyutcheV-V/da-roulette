@@ -112,8 +112,7 @@ module.exports = async function handler(req, res) {
       if (action === "start") {
         const liters = Math.max(1, Math.round(Number(body.liters) || 10));
         const ttlSeconds = Math.max(5, Math.round(Number(body.ttlSeconds) || 30));
-        await redis("SET", ROUND_KEY, liters, "EX", ttlSeconds);
-        await redis("DEL", CATCHES_KEY);
+        await redis("EVAL", "redis.call('DEL', KEYS[2]); redis.call('SET', KEYS[1], ARGV[1], 'EX', ARGV[2]); return 1", 2, ROUND_KEY, CATCHES_KEY, liters, ttlSeconds);
         res.status(200).json({ ok: true, liters });
         return;
       }
@@ -138,30 +137,27 @@ module.exports = async function handler(req, res) {
         }
         const user = String(body.user || "").toLowerCase().trim();
         if (!user) { res.status(400).json({ error: "missing user" }); return; }
-        // проверяем до декремента: DECRBY на отсутствующем ключе сам создаёт
-        // его (как 0) БЕЗ TTL, и раунд выглядел бы "активным" вечно
-        const currentRaw = await redis("GET", ROUND_KEY);
-        if (currentRaw === null) {
+        // One Redis transaction: a catch, its balance credit and the visible
+        // result list must succeed together, including at the expiry boundary.
+        const result = await redis("EVAL", `
+          local current = redis.call('GET', KEYS[1])
+          if not current then return {-1} end
+          if tonumber(current) <= 0 then return {-2} end
+          local remaining = redis.call('DECRBY', KEYS[1], 1)
+          local balance = redis.call('ZINCRBY', KEYS[3], 1, ARGV[1])
+          redis.call('RPUSH', KEYS[2], ARGV[1])
+          redis.call('EXPIRE', KEYS[2], 300)
+          return {remaining, balance}
+        `, 3, ROUND_KEY, CATCHES_KEY, BALANCE_KEY, user);
+        if (Number(result[0]) === -1) {
           res.status(200).json({ ok: true, caught: false, reason: "no_round" });
           return;
         }
-        if (Number(currentRaw) <= 0) {
+        if (Number(result[0]) === -2) {
           res.status(200).json({ ok: true, caught: false, reason: "empty", remaining: 0 });
           return;
         }
-        const remaining = await redis("DECRBY", ROUND_KEY, 1);
-        if (remaining < 0) {
-          await redis("INCRBY", ROUND_KEY, 1); // кто-то поймал параллельно последний литр — компенсируем
-          res.status(200).json({ ok: true, caught: false, reason: "empty", remaining: 0 });
-          return;
-        }
-        await Promise.all([
-          redis("ZINCRBY", BALANCE_KEY, 1, user),
-          redis("RPUSH", CATCHES_KEY, user),
-        ]);
-        await redis("EXPIRE", CATCHES_KEY, 60); // не держим список поймавших вечно
-        const balance = await redis("ZSCORE", BALANCE_KEY, user);
-        res.status(200).json({ ok: true, caught: true, remaining, balance: Number(balance) });
+        res.status(200).json({ ok: true, caught: true, remaining: Number(result[0]), balance: Number(result[1]) });
         return;
       }
 

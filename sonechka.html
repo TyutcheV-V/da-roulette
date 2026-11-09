@@ -1661,16 +1661,17 @@
     try{
       const r = await fetch(url, {
         method:"POST", headers:{ "Content-Type":"application/json" },
-        body: JSON.stringify({ action:"start", liters, ttlSeconds })
+        body: JSON.stringify({ action:"start", liters, ttlSeconds }),
+        signal: AbortSignal.timeout(12000)
       });
-      return r.ok;
+      return r.ok && (await r.json()).ok === true;
     }catch(e){ console.warn("catch start failed", e); return false; }
   }
   async function fetchCatchStatus(){
     const url = catchEndpoint();
     if(!url) return null;
     try{
-      const r = await fetch(`${url}?action=status`);
+      const r = await fetch(`${url}?action=status`, { cache:"no-store", signal:AbortSignal.timeout(8000) });
       if(!r.ok) return null;
       return await r.json();
     }catch(e){ console.warn("catch status failed", e); return null; }
@@ -1934,15 +1935,39 @@
     startCatchRound(liters);
   }
 
+  let catchRoundQueue = Promise.resolve();
   function startCatchRound(liters){
-    const windowSeconds = cfg.catchWindowSeconds||10;
-    showBubble(`🥛 Сонечка брызгает молоком! Лови командой ${cfg.catchCommand}`);
-    fillNotice(catchBanner,"Соня разливает молоко",cfg.catchCommand,`${liters} л · лови в чате, пока молоко не закончилось`);
-    catchBanner.classList.add("show");
-    startCatchRoundOnServer(liters, windowSeconds + 5); // +5с запас на задержку бота
-    setTimeout(async () => {
+    if(isDockSettings) return;
+    catchRoundQueue = catchRoundQueue.then(() => runCatchRound(liters)).catch(e => {
+      console.error("catch round failed", e);
       catchBanner.classList.remove("show");
-      const status = await fetchCatchStatus();
+      showBubble("Не удалось получить итоги ловли. Проверю связь...");
+    });
+    return catchRoundQueue;
+  }
+  async function runCatchRound(liters){
+    const windowSeconds = cfg.catchWindowSeconds||10;
+    const opened = await startCatchRoundOnServer(liters, windowSeconds + 5);
+    if(!opened){
+      showBubble("Не удалось открыть ловлю молока. Нет связи с сервером.");
+      return;
+    }
+    showBubble(`🥛 Сонечка брызгает молоком! Лови командой ${cfg.catchCommand}`);
+    fillNotice(catchBanner,"Лови молочко!",cfg.catchCommand,`${liters} л · лови в чате, пока молоко не закончилось`);
+    catchBanner.classList.add("show");
+    await new Promise(resolve => setTimeout(resolve, windowSeconds*1000));
+      catchBanner.classList.remove("show");
+      // Allow the bot's in-flight commands to finish before reading the list.
+      await new Promise(resolve => setTimeout(resolve, 5500));
+      let status = null;
+      for(let attempt=0; attempt<3 && !status; attempt++){
+        status = await fetchCatchStatus();
+        if(!status) await new Promise(resolve => setTimeout(resolve, 1500));
+      }
+      if(!status){
+        showBubble("Не удалось загрузить итоги ловли. Балансы можно проверить: !молочко");
+        return;
+      }
       const catches = (status && status.catches) || [];
       if(catches.length){
         const counts = new Map();
@@ -1956,7 +1981,6 @@
         showBubble("Молоко никто не поймал, разлилось...");
       }
       fetchStats();
-    }, windowSeconds*1000);
   }
 
   // ---------- decay over time (neglect) ----------

@@ -34,7 +34,9 @@ async function reportCatch(user) {
     method: "POST",
     headers: { "Content-Type": "application/json", "X-Bot-Secret": CATCH_SECRET },
     body: JSON.stringify({ action: "catch", user }),
+    signal: AbortSignal.timeout(10000),
   });
+  if (!res.ok) throw new Error(`catch API HTTP ${res.status}`);
   return res.json();
 }
 
@@ -143,6 +145,7 @@ client.on("message", async (channel, tags, message, self) => {
       const result = await reportCatch(login);
       // намеренно молчим в чате на каждую дойку — иначе чат зафлудит при
       // дойке в 10 литров за несколько секунд; результат виден на экране
+      console.log(new Date().toISOString(), "catch", login, result.caught ? "credited" : result.reason || result.error || "failed");
       if (!result.ok) console.warn("catch api error", result);
     } catch (e) {
       console.error("catch request failed", e);
@@ -221,6 +224,12 @@ setInterval(checkNag, 20 * 1000);
 const http = require("http");
 const PORT = process.env.PORT || 3000;
 http.createServer((req, res) => {
+  if (req.url === "/health") {
+    const connected = client.readyState() === "OPEN";
+    res.writeHead(connected ? 200 : 503, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({ connected, channel: CHANNEL }));
+    return;
+  }
   res.writeHead(200, { "Content-Type": "text/plain; charset=utf-8" });
   res.end("Сонечка-бот жива\n");
 }).listen(PORT, () => console.log(`health check server listening on :${PORT}`));
